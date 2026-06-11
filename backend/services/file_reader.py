@@ -1,21 +1,20 @@
+import os
 import pandas as pd
 
 
 def read_uploaded_file(file_path: str) -> pd.DataFrame:
-    """
-    Reads CSV or Excel files and returns a pandas DataFrame.
-    """
+    if not os.path.exists(file_path):
+        raise ValueError("File not found.")
 
-    if file_path.endswith(".csv"):
-        df = pd.read_csv(file_path)
+    lower_path = file_path.lower()
 
-    elif file_path.endswith(".xlsx") or file_path.endswith(".xls"):
-        df = pd.read_excel(file_path)
+    if lower_path.endswith(".csv"):
+        try:
+            return pd.read_csv(file_path)
+        except UnicodeDecodeError:
+            return pd.read_csv(file_path, encoding="latin1")
 
-    else:
-        raise ValueError("Unsupported file type. Upload CSV or Excel files only.")
+    if lower_path.endswith(".xlsx") or lower_path.endswith(".xls"):
+        return pd.read_excel(file_path)
 
-    if df.empty:
-        raise ValueError("Uploaded file is empty.")
-
-    return df
+    raise ValueError("Unsupported file type. Upload CSV or Excel only.")
