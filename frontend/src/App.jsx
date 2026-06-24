@@ -34,6 +34,23 @@ function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [frontendError, setFrontendError] = useState("");
+  const [targetColumn, setTargetColumn] = useState("");
+  const [algorithm, setAlgorithm] = useState("random_forest");
+  const [testSize, setTestSize] = useState("0.2");
+  const [mlResult, setMlResult] = useState(null);
+  const [compareResult, setCompareResult] = useState(null);
+  const [mlLoading, setMlLoading] = useState(false);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [mlError, setMlError] = useState("");
+  const [modelId, setModelId] = useState("");
+  const [predictionFile, setPredictionFile] = useState(null);
+  const [predictionResult, setPredictionResult] = useState(null);
+  const [predictionLoading, setPredictionLoading] = useState(false);
+  const [predictionError, setPredictionError] = useState("");
+
+  const [targetSuggestion, setTargetSuggestion] = useState(null);
+  const [targetSuggestionLoading, setTargetSuggestionLoading] = useState(false);
+  const [targetSuggestionError, setTargetSuggestionError] = useState("");
 
   const pieColors = [
     "#38bdf8",
@@ -101,11 +118,158 @@ function App() {
       console.log("Parsed analysis result:", data);
 
       setResult(data);
+      const columns = Object.keys(data.schema?.dtypes || {});
+      setTargetColumn((currentTarget) => currentTarget || columns[columns.length - 1] || "");
+      setTargetSuggestion(null);
+      setTargetSuggestionError("");
     } catch (error) {
       console.error("Frontend analysis error:", error);
       setFrontendError(error.message || "Analysis failed.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const datasetColumns = Object.keys(result?.schema?.dtypes || {});
+  const datasetFilename = result?.filename || "";
+
+  const algorithmOptions = [
+    ["random_forest", "Random Forest"],
+    ["extra_trees", "Extra Trees"],
+    ["decision_tree", "Decision Tree"],
+    ["knn", "KNN"],
+    ["svm", "SVM"],
+    ["logistic_regression", "Logistic Regression"],
+    ["linear_regression", "Linear Regression"],
+    ["ridge", "Ridge Regression"],
+    ["lasso", "Lasso Regression"],
+  ];
+
+  const callFormEndpoint = async (endpoint, formData) => {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const text = await response.text();
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error("Backend did not return valid JSON.");
+    }
+
+    if (!response.ok) {
+      throw new Error(data.detail || "Backend returned an error.");
+    }
+
+    return data;
+  };
+
+  const buildTrainingForm = () => {
+    if (!datasetFilename) {
+      throw new Error("Run Statistics Studio analysis first so ML Studio can use the uploaded dataset.");
+    }
+
+    if (!targetColumn) {
+      throw new Error("Choose a target column.");
+    }
+
+    const numericTestSize = Number(testSize);
+
+    if (!Number.isFinite(numericTestSize) || numericTestSize <= 0 || numericTestSize >= 1) {
+      throw new Error("Test size must be between 0 and 1. Example: 0.2");
+    }
+
+    const formData = new FormData();
+    formData.append("filename", datasetFilename);
+    formData.append("target_column", targetColumn);
+    formData.append("test_size", String(numericTestSize));
+
+    return formData;
+  };
+
+  const trainModel = async () => {
+    setMlLoading(true);
+    setMlError("");
+
+    try {
+      const formData = buildTrainingForm();
+      formData.append("algorithm", algorithm);
+
+      const data = await callFormEndpoint("/api/train-model", formData);
+
+      setMlResult(data);
+      setModelId(data.model_id || "");
+      setPredictionError("");
+    } catch (error) {
+      setMlError(error.message || "Model training failed.");
+    } finally {
+      setMlLoading(false);
+    }
+  };
+
+  const compareModels = async () => {
+    setCompareLoading(true);
+    setMlError("");
+
+    try {
+      const formData = buildTrainingForm();
+      const data = await callFormEndpoint("/api/compare-models", formData);
+
+      setCompareResult(data);
+    } catch (error) {
+      setMlError(error.message || "Model comparison failed.");
+    } finally {
+      setCompareLoading(false);
+    }
+  };
+
+  const fetchTargetSuggestion = async () => {
+    if (!datasetFilename) return;
+    setTargetSuggestionLoading(true);
+    setTargetSuggestionError("");
+    setTargetSuggestion(null);
+    try {
+      const formData = new FormData();
+      formData.append("filename", datasetFilename);
+      formData.append("domain", domain);
+      const data = await callFormEndpoint("/api/recommend-target", formData);
+      setTargetSuggestion(data);
+    } catch (error) {
+      setTargetSuggestionError(error.message || "Could not fetch target suggestion.");
+    } finally {
+      setTargetSuggestionLoading(false);
+    }
+  };
+
+  const predictTestData = async () => {
+    if (!modelId.trim()) {
+      setPredictionError("Train a model first or paste a saved model ID.");
+      return;
+    }
+
+    if (!predictionFile) {
+      setPredictionError("Upload a CSV or Excel test dataset.");
+      return;
+    }
+
+    setPredictionLoading(true);
+    setPredictionError("");
+    setPredictionResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("model_id", modelId.trim());
+      formData.append("file", predictionFile);
+
+      const data = await callFormEndpoint("/api/predict-test-data", formData);
+      setPredictionResult(data);
+    } catch (error) {
+      setPredictionError(error.message || "Prediction failed.");
+    } finally {
+      setPredictionLoading(false);
     }
   };
 
@@ -293,16 +457,267 @@ function App() {
     <section>
       <Header
         title="ML Studio"
-        subtitle="Model training will be connected after Statistics Studio is stable."
+        subtitle="Train models, compare algorithms, and save models for predictions."
       />
 
-      <div className="empty">
-        <h3>ML Studio temporarily paused</h3>
-        <p>
-          First we are fixing the frontend upload-analysis flow. Once this works,
-          ML Studio can be reconnected safely.
-        </p>
-      </div>
+      {!result && (
+        <div className="warning">
+          <h4>No analyzed dataset loaded</h4>
+          <p>
+            Run Statistics Studio first. ML Studio uses that uploaded dataset
+            and its detected columns.
+          </p>
+          <button className="primary" onClick={() => setCurrentPage("statistics")}>
+            Open Statistics Studio
+          </button>
+        </div>
+      )}
+
+      {result && (
+        <>
+          <Card title="Training Setup">
+            <div className="notice">
+              <p>
+                Dataset ready: <strong>{datasetFilename}</strong>
+              </p>
+            </div>
+
+            {/* ── Suggested Target Banner ── */}
+            <div className="suggest-target-bar">
+              <button
+                className="suggest-btn"
+                onClick={fetchTargetSuggestion}
+                disabled={targetSuggestionLoading}
+              >
+                {targetSuggestionLoading ? "Analyzing…" : "✦ Suggest Target Variable"}
+              </button>
+
+              {targetSuggestionError && (
+                <span className="suggest-error">{targetSuggestionError}</span>
+              )}
+            </div>
+
+            {targetSuggestion && (
+              <div className="suggestion-panel">
+                {targetSuggestion.best_target ? (
+                  <>
+                    <div className="suggestion-header">
+                      <span className="suggestion-badge">AI Recommended</span>
+                      <span className="suggestion-domain">Domain: {targetSuggestion.domain}</span>
+                    </div>
+
+                    <div className="suggestion-best">
+                      <div className="suggestion-col-name">
+                        {targetSuggestion.best_target.column}
+                      </div>
+                      <div className="suggestion-meta">
+                        <span className={`priority-tag priority-${targetSuggestion.best_target.priority.toLowerCase()}`}>
+                          {targetSuggestion.best_target.priority} Priority
+                        </span>
+                        <span className="task-tag">{targetSuggestion.best_target.task_type}</span>
+                        <span className="score-tag">Score {targetSuggestion.best_target.score}/100</span>
+                      </div>
+
+                      {targetSuggestion.best_target.reasons?.length > 0 && (
+                        <ul className="suggestion-reasons">
+                          {targetSuggestion.best_target.reasons.map((r, i) => (
+                            <li key={i}>✓ {r}</li>
+                          ))}
+                        </ul>
+                      )}
+
+                      {targetSuggestion.best_target.warnings?.length > 0 && (
+                        <ul className="suggestion-warnings">
+                          {targetSuggestion.best_target.warnings.map((w, i) => (
+                            <li key={i}>⚠ {w}</li>
+                          ))}
+                        </ul>
+                      )}
+
+                      <button
+                        className="use-target-btn"
+                        onClick={() => setTargetColumn(targetSuggestion.best_target.column)}
+                      >
+                        Use "{targetSuggestion.best_target.column}" as Target
+                      </button>
+                    </div>
+
+                    {targetSuggestion.recommended_targets?.length > 1 && (
+                      <div className="suggestion-others">
+                        <p className="suggestion-others-label">Other candidates</p>
+                        <div className="suggestion-others-grid">
+                          {targetSuggestion.recommended_targets.slice(1, 5).map((t) => (
+                            <button
+                              key={t.column}
+                              className="other-target-btn"
+                              onClick={() => setTargetColumn(t.column)}
+                            >
+                              <span>{t.column}</span>
+                              <small>{t.task_type} · {t.score}/100</small>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {targetSuggestion.advisor_summary?.length > 0 && (
+                      <div className="suggestion-summary">
+                        {targetSuggestion.advisor_summary.map((s, i) => (
+                          <p key={i}>{s}</p>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="suggestion-empty">
+                    No strong target found. Choose a column manually.
+                  </p>
+                )}
+              </div>
+            )}
+            {/* ── End Suggested Target ── */}
+
+            <div className="ml-grid">
+              <div className="input-group">
+                <label>Target Column</label>
+                <select
+                  value={targetColumn}
+                  onChange={(e) => setTargetColumn(e.target.value)}
+                >
+                  <option value="">Choose target</option>
+                  {datasetColumns.map((column) => (
+                    <option value={column} key={column}>
+                      {column}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="input-group">
+                <label>Algorithm</label>
+                <select
+                  value={algorithm}
+                  onChange={(e) => setAlgorithm(e.target.value)}
+                >
+                  {algorithmOptions.map(([value, label]) => (
+                    <option value={value} key={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="input-group">
+                <label>Test Size</label>
+                <input
+                  type="number"
+                  min="0.1"
+                  max="0.9"
+                  step="0.05"
+                  value={testSize}
+                  onChange={(e) => setTestSize(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="action-row">
+              <button className="primary" onClick={trainModel} disabled={mlLoading}>
+                {mlLoading ? "Training..." : "Train Model"}
+              </button>
+
+              <button
+                className="primary green"
+                onClick={compareModels}
+                disabled={compareLoading}
+              >
+                {compareLoading ? "Comparing..." : "Compare Models"}
+              </button>
+            </div>
+          </Card>
+
+          {mlError && (
+            <div className="warning">
+              <h4>ML Error</h4>
+              <p>{mlError}</p>
+            </div>
+          )}
+
+          {mlResult && (
+            <>
+              <div className="summary-grid">
+                <Summary label="Task Type" value={mlResult.task_type} />
+                <Summary label="Algorithm" value={mlResult.algorithm} />
+                <Summary label="Rows Used" value={mlResult.rows_used} />
+                <Summary label="Test Rows" value={mlResult.test_rows} />
+              </div>
+
+              <Card title="Saved Model">
+                <div className="result-box">
+                  <span>Model ID</span>
+                  <strong>{mlResult.model_id}</strong>
+                </div>
+                <InsightList items={mlResult.model_explanation || []} />
+              </Card>
+
+              <Card title="Model Metrics">
+                <MetricGrid metrics={mlResult.metrics} />
+              </Card>
+
+              {!!mlResult.feature_importance?.length && (
+                <Card title="Feature Importance">
+                  <FeatureList
+                    items={mlResult.feature_importance.map((item) => ({
+                      label: item.feature,
+                      value: item.importance,
+                    }))}
+                  />
+                </Card>
+              )}
+
+              <Card title="Training Details">
+                <FeatureList
+                  items={[
+                    { label: "Target", value: mlResult.target_column },
+                    { label: "Train Rows", value: mlResult.train_rows },
+                    { label: "Test Size", value: mlResult.test_size },
+                    {
+                      label: "Numeric Features",
+                      value: mlResult.numeric_features?.join(", ") || "None",
+                    },
+                    {
+                      label: "Categorical Features",
+                      value: mlResult.categorical_features?.join(", ") || "None",
+                    },
+                    {
+                      label: "Dropped Columns",
+                      value:
+                        mlResult.dropped_high_cardinality_columns?.join(", ") ||
+                        "None",
+                    },
+                  ]}
+                />
+              </Card>
+            </>
+          )}
+
+          {compareResult && (
+            <Card title="AutoML Compare">
+              <div className="summary-grid">
+                <Summary label="Best Model" value={compareResult.best_model} />
+                <Summary label="Task Type" value={compareResult.task_type} />
+                <Summary label="Metric" value={compareResult.ranking_metric} />
+                <Summary
+                  label="Rows Used"
+                  value={compareResult.rows_used_for_compare}
+                />
+              </div>
+
+              <Leaderboard rows={compareResult.leaderboard || []} />
+              <InsightList items={compareResult.warnings || []} />
+            </Card>
+          )}
+        </>
+      )}
     </section>
   );
 
@@ -310,15 +725,105 @@ function App() {
     <section>
       <Header
         title="Prediction Studio"
-        subtitle="Prediction flow will be reconnected after ML Studio."
+        subtitle="Use saved models to generate predictions on test data."
       />
 
-      <div className="empty">
-        <h3>Prediction Studio temporarily paused</h3>
-        <p>
-          After statistics and ML are stable, prediction upload will be connected.
-        </p>
-      </div>
+      <Card title="Prediction Input">
+        {mlResult && (
+          <div className="notice">
+            <p>
+              Latest trained model loaded: <strong>{mlResult.model_id}</strong>
+            </p>
+          </div>
+        )}
+
+        <div className="ml-grid">
+          <div className="input-group">
+            <label>Model ID</label>
+            <input
+              value={modelId}
+              onChange={(e) => setModelId(e.target.value)}
+              placeholder="Train a model or paste a saved model ID"
+            />
+          </div>
+
+          <div className="input-group">
+            <label>Test Dataset</label>
+            <input
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              onChange={(e) => {
+                setPredictionFile(e.target.files[0]);
+                setPredictionResult(null);
+                setPredictionError("");
+              }}
+            />
+            {predictionFile && (
+              <span className="file-name">{predictionFile.name}</span>
+            )}
+          </div>
+
+          <button
+            className="primary"
+            onClick={predictTestData}
+            disabled={predictionLoading}
+          >
+            {predictionLoading ? "Generating..." : "Generate Predictions"}
+          </button>
+        </div>
+      </Card>
+
+      {predictionError && (
+        <div className="warning">
+          <h4>Prediction Error</h4>
+          <p>{predictionError}</p>
+        </div>
+      )}
+
+      {!predictionResult && !predictionLoading && (
+        <Empty
+          title="No predictions generated yet."
+          text="Train a model, upload compatible test data, and generate predictions."
+        />
+      )}
+
+      {predictionResult && (
+        <>
+          <div className="summary-grid">
+            <Summary label="Rows Predicted" value={predictionResult.rows_predicted} />
+            <Summary label="Task Type" value={predictionResult.task_type} />
+            <Summary label="Target" value={predictionResult.target_column} />
+            <Summary
+              label="Prediction Column"
+              value={predictionResult.prediction_column}
+            />
+          </div>
+
+          <Card title="Prediction Output">
+            <div className="result-box">
+              <span>Prediction File</span>
+              <strong>{predictionResult.prediction_filename}</strong>
+            </div>
+
+            <a
+              className="download-btn"
+              href={`${API_BASE_URL}/api/download-predictions/${predictionResult.prediction_filename}`}
+            >
+              Download Predictions CSV
+            </a>
+          </Card>
+
+          {predictionResult.external_test_metrics && (
+            <Card title="External Test Metrics">
+              <MetricGrid metrics={predictionResult.external_test_metrics} />
+            </Card>
+          )}
+
+          <Card title="Prediction Preview">
+            <PreviewTable rows={predictionResult.preview || []} />
+          </Card>
+        </>
+      )}
     </section>
   );
 
@@ -364,6 +869,108 @@ function App() {
         <span>{label}</span>
         <strong>{value ?? "N/A"}</strong>
         {small && <small>{small}</small>}
+      </div>
+    );
+  }
+
+  function displayValue(value) {
+    if (Array.isArray(value)) return JSON.stringify(value);
+    if (value && typeof value === "object") return JSON.stringify(value);
+    if (value === null || value === undefined || value === "") return "N/A";
+    return String(value);
+  }
+
+  function MetricGrid({ metrics }) {
+    const entries = Object.entries(metrics || {});
+
+    if (!entries.length) {
+      return <div className="empty-small">No metrics available.</div>;
+    }
+
+    return (
+      <div className="summary-grid">
+        {entries.map(([key, value]) => (
+          <Summary
+            label={key.replaceAll("_", " ")}
+            value={displayValue(value)}
+            key={key}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  function FeatureList({ items }) {
+    if (!items?.length) {
+      return <div className="empty-small">No details available.</div>;
+    }
+
+    return (
+      <div className="feature-list">
+        {items.map((item, index) => (
+          <div className="feature-row" key={`${item.label}-${index}`}>
+            <span>{item.label}</span>
+            <strong>{displayValue(item.value)}</strong>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function Leaderboard({ rows }) {
+    if (!rows?.length) {
+      return <div className="empty-small">No comparison results available.</div>;
+    }
+
+    return (
+      <div className="leaderboard">
+        <div className="leaderboard-head">
+          <span>Rank</span>
+          <span>Algorithm</span>
+          <span>Score</span>
+          <span>Metrics</span>
+        </div>
+
+        {rows.map((row, index) => (
+          <div className="leaderboard-row" key={`${row.algorithm}-${index}`}>
+            <span>#{index + 1}</span>
+            <code>{row.algorithm}</code>
+            <strong>{row.score ?? "Failed"}</strong>
+            <code>{row.error || JSON.stringify(row.metrics || {})}</code>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  function PreviewTable({ rows }) {
+    if (!rows?.length) {
+      return <div className="empty-small">No preview rows returned.</div>;
+    }
+
+    const columns = Object.keys(rows[0] || {});
+
+    return (
+      <div className="table-wrapper">
+        <table className="preview-table">
+          <thead>
+            <tr>
+              {columns.map((column) => (
+                <th key={column}>{column}</th>
+              ))}
+            </tr>
+          </thead>
+
+          <tbody>
+            {rows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {columns.map((column) => (
+                  <td key={column}>{displayValue(row[column])}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     );
   }

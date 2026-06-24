@@ -19,6 +19,11 @@ dist/
 # Logs
 *.log
 
+# App runtime artifacts
+backend/saved_models/
+backend/predictions/
+backend/uploads/test_*
+
 # OS
 .DS_Store
 Thumbs.db
