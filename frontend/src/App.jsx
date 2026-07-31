@@ -23,11 +23,7 @@ import "./App.css";
 const API_BASE_URL = "http://127.0.0.1:8000";
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentPage, setCurrentPage] = useState("dashboard");
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
 
   const [file, setFile] = useState(null);
   const [domain, setDomain] = useState("business");
@@ -51,6 +47,19 @@ function App() {
   const [targetSuggestion, setTargetSuggestion] = useState(null);
   const [targetSuggestionLoading, setTargetSuggestionLoading] = useState(false);
   const [targetSuggestionError, setTargetSuggestionError] = useState("");
+  const [datasetId, setDatasetId] = useState("");
+
+  // MLOps Studio state
+  const [mlopsTab, setMlopsTab] = useState("experiments");
+  const [experiments, setExperiments] = useState([]);
+  const [models, setModels] = useState([]);
+  const [datasets, setDatasets] = useState([]);
+  const [mlopsLoading, setMlopsLoading] = useState(false);
+  const [mlopsError, setMlopsError] = useState("");
+  const [selectedExperiment, setSelectedExperiment] = useState(null);
+  const [selectedModel, setSelectedModel] = useState(null);
+  const [stageTarget, setStageTarget] = useState({});
+  const [stageLoading, setStageLoading] = useState({});
 
   const pieColors = [
     "#38bdf8",
@@ -62,17 +71,6 @@ function App() {
     "#14b8a6",
     "#818cf8",
   ];
-
-  const handleLogin = (e) => {
-    e.preventDefault();
-
-    if (!email.trim() || !password.trim()) {
-      alert("Enter email and password.");
-      return;
-    }
-
-    setIsLoggedIn(true);
-  };
 
   const analyze = async () => {
     if (!file) {
@@ -120,6 +118,7 @@ function App() {
       setResult(data);
       const columns = Object.keys(data.schema?.dtypes || {});
       setTargetColumn((currentTarget) => currentTarget || columns[columns.length - 1] || "");
+      setDatasetId(data.dataset_id || "");
       setTargetSuggestion(null);
       setTargetSuggestionError("");
     } catch (error) {
@@ -186,6 +185,7 @@ function App() {
     formData.append("filename", datasetFilename);
     formData.append("target_column", targetColumn);
     formData.append("test_size", String(numericTestSize));
+    if (datasetId) formData.append("dataset_id", datasetId);
 
     return formData;
   };
@@ -225,6 +225,338 @@ function App() {
       setCompareLoading(false);
     }
   };
+
+  // ── MLOps data fetchers ──────────────────────────────────────────
+
+  const fetchExperiments = async () => {
+    setMlopsLoading(true);
+    setMlopsError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/experiments/`);
+      const data = await res.json();
+      setExperiments(data.experiments || []);
+    } catch {
+      setMlopsError("Failed to load experiments.");
+    } finally {
+      setMlopsLoading(false);
+    }
+  };
+
+  const fetchModels = async () => {
+    setMlopsLoading(true);
+    setMlopsError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/models/`);
+      const data = await res.json();
+      setModels(data.models || []);
+    } catch {
+      setMlopsError("Failed to load models.");
+    } finally {
+      setMlopsLoading(false);
+    }
+  };
+
+  const fetchDatasets = async () => {
+    setMlopsLoading(true);
+    setMlopsError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/datasets/`);
+      if (res.ok) {
+        const data = await res.json();
+        setDatasets(data.datasets || []);
+      }
+    } catch {
+      setMlopsError("Failed to load datasets.");
+    } finally {
+      setMlopsLoading(false);
+    }
+  };
+
+  const transitionModelStage = async (modelId, stage) => {
+    setStageLoading((prev) => ({ ...prev, [modelId]: true }));
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/models/${modelId}/transition?stage=${stage}`,
+        { method: "POST" }
+      );
+      if (res.ok) {
+        await fetchModels();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setStageLoading((prev) => ({ ...prev, [modelId]: false }));
+    }
+  };
+
+  const loadMlopsTab = (tab) => {
+    setMlopsTab(tab);
+    setSelectedExperiment(null);
+    setSelectedModel(null);
+    if (tab === "experiments") fetchExperiments();
+    if (tab === "models") fetchModels();
+    if (tab === "datasets") fetchDatasets();
+  };
+  // ── MLOps Studio component ────────────────────────────────────────
+
+  const MLOpsStudio = () => (
+    <section>
+      <Header title="MLOps Studio" subtitle="Experiments, model registry, and dataset lineage." />
+
+      {/* Tab bar */}
+      <div className="mlops-tabs">
+        {[
+          ["experiments", "🧪 Experiments"],
+          ["models", "📦 Model Registry"],
+          ["datasets", "🗄️ Dataset Registry"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            className={`mlops-tab-btn ${mlopsTab === key ? "active" : ""}`}
+            onClick={() => loadMlopsTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mlopsError && (
+        <div className="warning"><p>{mlopsError}</p></div>
+      )}
+
+      {mlopsLoading && (
+        <div className="empty"><h3>Loading…</h3></div>
+      )}
+
+      {/* ── Experiments Tab ── */}
+      {mlopsTab === "experiments" && !mlopsLoading && (
+        <>
+          {!experiments.length && !mlopsError && (
+            <Empty
+              title="No experiments yet."
+              text="Train a model in ML Studio and experiments will appear here automatically."
+            />
+          )}
+
+          {selectedExperiment && (
+            <div className="mlops-detail-overlay">
+              <div className="mlops-detail-card">
+                <div className="mlops-detail-head">
+                  <h3>Experiment #{selectedExperiment.id}</h3>
+                  <button className="close-btn" onClick={() => setSelectedExperiment(null)}>✕</button>
+                </div>
+                <div className="mlops-detail-body">
+                  <div className="mlops-kv-grid">
+                    <KV label="Algorithm" value={selectedExperiment.algorithm} />
+                    <KV label="Timestamp" value={new Date(selectedExperiment.timestamp).toLocaleString()} />
+                    <KV label="Dataset" value={selectedExperiment.dataset_info?.filename || "—"} />
+                    <KV label="Rows" value={selectedExperiment.dataset_info?.rows} />
+                    <KV label="Model ID" value={selectedExperiment.model_id || "—"} />
+                    <KV label="Dataset ID" value={selectedExperiment.dataset_id || "—"} />
+                  </div>
+                  <h4>Metrics</h4>
+                  <div className="mlops-metrics-grid">
+                    {Object.entries(selectedExperiment.metrics || {}).map(([k, v]) => (
+                      <div className="mlops-metric-chip" key={k}>
+                        <span>{k.replace(/_/g, " ")}</span>
+                        <strong>{typeof v === "number" ? v.toFixed(4) : v}</strong>
+                      </div>
+                    ))}
+                  </div>
+                  {Object.keys(selectedExperiment.hyperparameters || {}).length > 0 && (
+                    <>
+                      <h4>Hyperparameters</h4>
+                      <div className="mlops-metrics-grid">
+                        {Object.entries(selectedExperiment.hyperparameters).map(([k, v]) => (
+                          <div className="mlops-metric-chip" key={k}>
+                            <span>{k}</span>
+                            <strong>{String(v)}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {experiments.length > 0 && (
+            <div className="card">
+              <div className="mlops-table-head">
+                <span>#</span>
+                <span>Algorithm</span>
+                <span>Dataset</span>
+                <span>Primary Metric</span>
+                <span>Time</span>
+                <span></span>
+              </div>
+              {experiments.map((exp) => {
+                const metricEntries = Object.entries(exp.metrics || {});
+                const primaryMetric = metricEntries.find(
+                  ([k]) => k === "accuracy" || k === "f1_weighted" || k === "r2_score"
+                ) || metricEntries[0];
+                return (
+                  <div className="mlops-table-row" key={exp.id}>
+                    <span className="mlops-id-badge">#{exp.id}</span>
+                    <code>{exp.algorithm}</code>
+                    <span className="mlops-truncate">{exp.dataset_info?.filename || "—"}</span>
+                    <span className="mlops-metric-inline">
+                      {primaryMetric
+                        ? <><small>{primaryMetric[0].replace(/_/g, " ")}</small> <strong>{typeof primaryMetric[1] === "number" ? primaryMetric[1].toFixed(4) : primaryMetric[1]}</strong></>
+                        : "—"}
+                    </span>
+                    <span className="mlops-time">{new Date(exp.timestamp).toLocaleDateString()}</span>
+                    <button className="mlops-view-btn" onClick={() => setSelectedExperiment(exp)}>View</button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Model Registry Tab ── */}
+      {mlopsTab === "models" && !mlopsLoading && (
+        <>
+          {!models.length && !mlopsError && (
+            <Empty
+              title="No registered models yet."
+              text="Train a model in ML Studio and it will auto-register here."
+            />
+          )}
+
+          {selectedModel && (
+            <div className="mlops-detail-overlay">
+              <div className="mlops-detail-card">
+                <div className="mlops-detail-head">
+                  <h3>Model Details</h3>
+                  <button className="close-btn" onClick={() => setSelectedModel(null)}>✕</button>
+                </div>
+                <div className="mlops-detail-body">
+                  <div className="mlops-id-copy">
+                    <code>{selectedModel.model_id}</code>
+                  </div>
+                  <div className="mlops-kv-grid">
+                    <KV label="Algorithm" value={selectedModel.metadata?.algorithm} />
+                    <KV label="Task Type" value={selectedModel.metadata?.task_type} />
+                    <KV label="Target Column" value={selectedModel.metadata?.target_column} />
+                    <KV label="Dataset ID" value={selectedModel.metadata?.dataset_id || "—"} />
+                    <KV label="Registered" value={new Date(selectedModel.registered_at).toLocaleString()} />
+                    <KV label="Stage" value={selectedModel.versions?.[0]?.stage || "development"} />
+                  </div>
+                  <h4>Promote Stage</h4>
+                  <div className="stage-row">
+                    {["development", "staging", "production", "archived"].map((s) => (
+                      <button
+                        key={s}
+                        className={`stage-btn stage-${s} ${selectedModel.versions?.[0]?.stage === s ? "active" : ""}`}
+                        disabled={stageLoading[selectedModel.model_id]}
+                        onClick={async () => {
+                          await transitionModelStage(selectedModel.model_id, s);
+                          setSelectedModel((prev) => ({
+                            ...prev,
+                            versions: [{ ...prev.versions?.[0], stage: s }],
+                          }));
+                        }}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedModel.metadata?.metrics && (
+                    <>
+                      <h4>Metrics</h4>
+                      <div className="mlops-metrics-grid">
+                        {Object.entries(selectedModel.metadata.metrics).map(([k, v]) => (
+                          <div className="mlops-metric-chip" key={k}>
+                            <span>{k.replace(/_/g, " ")}</span>
+                            <strong>{typeof v === "number" ? v.toFixed(4) : v}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {models.length > 0 && (
+            <div className="card">
+              <div className="mlops-table-head">
+                <span>Model ID</span>
+                <span>Algorithm</span>
+                <span>Target</span>
+                <span>Stage</span>
+                <span>Registered</span>
+                <span></span>
+              </div>
+              {models.map((m) => {
+                const stage = m.versions?.[0]?.stage || "development";
+                return (
+                  <div className="mlops-table-row" key={m.model_id}>
+                    <code className="mlops-truncate">{m.model_id}</code>
+                    <code>{m.metadata?.algorithm || "—"}</code>
+                    <span>{m.metadata?.target_column || "—"}</span>
+                    <span className={`stage-pill stage-${stage}`}>{stage}</span>
+                    <span className="mlops-time">{new Date(m.registered_at).toLocaleDateString()}</span>
+                    <button className="mlops-view-btn" onClick={() => setSelectedModel(m)}>View</button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Dataset Registry Tab ── */}
+      {mlopsTab === "datasets" && !mlopsLoading && (
+        <>
+          {!datasets.length && !mlopsError && (
+            <Empty
+              title="No datasets registered yet."
+              text="Upload and analyze a dataset in Statistics Studio to register it."
+            />
+          )}
+
+          {datasets.length > 0 && (
+            <div className="card">
+              <div className="mlops-table-head mlops-table-datasets">
+                <span>ID</span>
+                <span>Filename</span>
+                <span>Rows</span>
+                <span>Columns</span>
+                <span>Missing Cells</span>
+                <span>Uploaded</span>
+              </div>
+              {datasets.map((d) => (
+                <div className="mlops-table-row mlops-table-datasets" key={d.id}>
+                  <span className="mlops-id-badge">#{d.id}</span>
+                  <span className="mlops-truncate">{d.original_filename}</span>
+                  <strong>{d.rows ?? "—"}</strong>
+                  <strong>{d.columns ?? "—"}</strong>
+                  <span className={d.missing_cells > 0 ? "text-warn" : "text-ok"}>
+                    {d.missing_cells ?? "—"}
+                  </span>
+                  <span className="mlops-time">{new Date(d.upload_time).toLocaleDateString()}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </section>
+  );
+
+  function KV({ label, value }) {
+    return (
+      <div className="mlops-kv">
+        <span>{label}</span>
+        <strong>{value ?? "—"}</strong>
+      </div>
+    );
+  }
 
   const fetchTargetSuggestion = async () => {
     if (!datasetFilename) return;
@@ -304,6 +636,13 @@ function App() {
           <h3>Prediction Studio</h3>
           <p>Use trained models on test datasets.</p>
           <button onClick={() => setCurrentPage("prediction")}>Open</button>
+        </div>
+
+        <div className="studio-card">
+          <div className="studio-tag">MLOps</div>
+          <h3>MLOps Studio</h3>
+          <p>Track experiments, manage model registry, and view dataset lineage.</p>
+          <button onClick={() => setCurrentPage("mlops")}>Open</button>
         </div>
       </div>
     </section>
@@ -1195,58 +1534,6 @@ function App() {
     );
   }
 
-  if (!isLoggedIn) {
-    return (
-      <div className="auth-page">
-        <div className="orb orb-one"></div>
-        <div className="orb orb-two"></div>
-
-        <div className="auth-card">
-          <div className="logo-block">
-            <div className="logo-icon">S</div>
-
-            <div>
-              <h1>StatMind AI</h1>
-              <p>Analytics + ML intelligence workspace</p>
-            </div>
-          </div>
-
-          <div className="auth-copy">
-            <h2>Turn raw datasets into decisions.</h2>
-            <p>
-              Access statistics, ML, AutoML, prediction, leakage detection, and
-              an AI analyst workspace.
-            </p>
-          </div>
-
-          <form className="login-form" onSubmit={handleLogin}>
-            <label>Email</label>
-            <input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-
-            <label>Password</label>
-            <input
-              type="password"
-              placeholder="Enter any password for demo"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-
-            <button type="submit">Enter Workspace</button>
-          </form>
-
-          <p className="demo-note">
-            Demo login only. Backend authentication can be added later.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -1265,29 +1552,23 @@ function App() {
             ["statistics", "Statistics Studio"],
             ["ml", "ML Studio"],
             ["prediction", "Prediction Studio"],
+            ["mlops", "MLOps Studio"],
           ].map(([key, label]) => (
             <button
               key={key}
               className={currentPage === key ? "active" : ""}
-              onClick={() => setCurrentPage(key)}
+              onClick={() => {
+              setCurrentPage(key);
+              if (key === "mlops") {
+                setMlopsTab("experiments");
+                fetchExperiments();
+              }
+            }}
             >
               {label}
             </button>
           ))}
         </nav>
-
-        <div className="user-chip">
-          <div className="avatar">{email.charAt(0).toUpperCase()}</div>
-
-          <div>
-            <strong>{email}</strong>
-            <span>Active session</span>
-          </div>
-        </div>
-
-        <button className="logout-btn" onClick={() => setIsLoggedIn(false)}>
-          Logout
-        </button>
       </aside>
 
       <main className="main">
@@ -1295,6 +1576,7 @@ function App() {
         {currentPage === "statistics" && <Statistics />}
         {currentPage === "ml" && <MLStudio />}
         {currentPage === "prediction" && <PredictionStudio />}
+        {currentPage === "mlops" && <MLOpsStudio />}
       </main>
     </div>
   );

@@ -1,0 +1,29 @@
+{
+  "datasets": {
+    "1": {
+      "id": "1",
+      "content_hash": "ea8cdf0c5fa7632d2aac5559b8901eb208cf1871b7b89652ef2982b4f116d5a3",
+      "original_filename": "transactions (1).csv",
+      "stored_filename": "transactions_(1).csv",
+      "upload_time": "2026-07-31T13:57:10.516272",
+      "rows": 23,
+      "columns": 3,
+      "missing_cells": 0,
+      "duplicate_rows": 0,
+      "file_path": "uploads\\transactions_(1).csv"
+    },
+    "2": {
+      "id": "2",
+      "content_hash": "e18dc564472ce77c1fe0e189492dc0bf3436ea05b5a00740a35c73899ea9572f",
+      "original_filename": "Credit_Card_Applications.csv",
+      "stored_filename": "Credit_Card_Applications.csv",
+      "upload_time": "2026-07-31T16:14:10.547002",
+      "rows": 690,
+      "columns": 16,
+      "missing_cells": 0,
+      "duplicate_rows": 0,
+      "file_path": "uploads\\Credit_Card_Applications.csv"
+    }
+  },
+  "next_id": 3
+}

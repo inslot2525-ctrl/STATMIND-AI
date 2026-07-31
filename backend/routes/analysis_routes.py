@@ -5,12 +5,21 @@ import traceback
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 
 from services.analysis_engine import analyze_file
-from services.dataset_registry import register_dataset
+from services.dataset_registry import register_dataset, list_datasets
 
 router = APIRouter()
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+
+@router.get("/datasets")
+async def get_datasets():
+    try:
+        datasets = list_datasets()
+        return {"datasets": datasets}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.post("/analyze")

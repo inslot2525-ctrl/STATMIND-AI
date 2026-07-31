@@ -1,0 +1,40 @@
+{
+  "models": {
+    "random_forest_Tx_Amount_ea3a1266.pkl": {
+      "model_id": "random_forest_Tx_Amount_ea3a1266.pkl",
+      "registered_at": "2026-07-31T17:49:49.446314",
+      "updated_at": "2026-07-31T17:49:49.446314",
+      "metadata": {
+        "algorithm": "random_forest",
+        "task_type": "regression",
+        "target_column": "Tx_Amount",
+        "features_used": [
+          "Sender_ID",
+          "Receiver_Acct"
+        ],
+        "numeric_features": [],
+        "categorical_features": [
+          "Sender_ID",
+          "Receiver_Acct"
+        ],
+        "label_mapping": null,
+        "test_size": 0.2,
+        "model_id": "random_forest_Tx_Amount_ea3a1266.pkl",
+        "metrics": {
+          "mae": 1502.2745,
+          "rmse": 2465.8108,
+          "r2_score": -0.5531
+        },
+        "dataset_id": "1"
+      },
+      "versions": [
+        {
+          "version": "1.0.0",
+          "stage": "development",
+          "registered_at": "2026-07-31T17:49:49.446314"
+        }
+      ]
+    }
+  },
+  "next_version": 1
+}

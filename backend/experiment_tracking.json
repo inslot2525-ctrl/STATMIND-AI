@@ -1,0 +1,27 @@
+{
+  "experiments": {
+    "1": {
+      "id": "1",
+      "timestamp": "2026-07-31T17:49:49.446314",
+      "dataset_id": "1",
+      "dataset_info": {
+        "filename": "transactions (1).csv",
+        "rows": 23,
+        "columns": 3
+      },
+      "algorithm": "random_forest",
+      "hyperparameters": {
+        "test_size": 0.2
+      },
+      "metrics": {
+        "mae": 1502.2745,
+        "rmse": 2465.8108,
+        "r2_score": -0.5531
+      },
+      "model_id": "random_forest_Tx_Amount_ea3a1266.pkl",
+      "tags": [],
+      "notes": ""
+    }
+  },
+  "next_id": 2
+}
