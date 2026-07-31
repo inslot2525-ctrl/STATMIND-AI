@@ -93,7 +93,7 @@ from services.experiment_tracker import (
     list_experiments, get_experiment, get_experiments_for_model
 )
 
-experiment_router = APIRouter(prefix="/api/experiments", tags=["Experiments"])
+experiment_router = APIRouter(prefix="/experiments", tags=["Experiments"])
 
 @experiment_router.get("/")
 async def get_experiments(dataset_id: str = None, limit: int = 50):
@@ -119,7 +119,7 @@ from services.model_registry import (
     transition_model_stage, get_production_models
 )
 
-model_router = APIRouter(prefix="/api/models", tags=["Model Registry"])
+model_router = APIRouter(prefix="/models", tags=["Model Registry"])
 
 @model_router.post("/register/{model_id}")
 async def register_existing_model(model_id: str):

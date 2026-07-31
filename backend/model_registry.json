@@ -3,7 +3,7 @@
     "random_forest_Tx_Amount_ea3a1266.pkl": {
       "model_id": "random_forest_Tx_Amount_ea3a1266.pkl",
       "registered_at": "2026-07-31T17:49:49.446314",
-      "updated_at": "2026-07-31T17:49:49.446314",
+      "updated_at": "2026-07-31T17:53:29.033068",
       "metadata": {
         "algorithm": "random_forest",
         "task_type": "regression",
@@ -25,13 +25,15 @@
           "rmse": 2465.8108,
           "r2_score": -0.5531
         },
-        "dataset_id": "1"
+        "dataset_id": "1",
+        "stage": "development"
       },
       "versions": [
         {
           "version": "1.0.0",
           "stage": "development",
-          "registered_at": "2026-07-31T17:49:49.446314"
+          "registered_at": "2026-07-31T17:49:49.446314",
+          "transitioned_at": "2026-07-31T17:53:29.033068"
         }
       ]
     }
