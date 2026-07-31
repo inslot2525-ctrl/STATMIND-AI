@@ -3,8 +3,10 @@ import uuid
 import joblib
 import pandas as pd
 import numpy as np
+from datetime import datetime
 
 from services.file_reader import read_uploaded_file
+from services.experiment_tracker import log_experiment
 
 from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer
@@ -189,7 +191,11 @@ def decode_classification_predictions(predictions, label_mapping):
     return decoded
 
 
-def prepare_ml_data(file_path: str, target_column: str, test_size: float):
+def prepare_ml_data(
+    file_path: str,
+    target_column: str,
+    test_size: float,
+):
     if not os.path.exists(file_path):
         raise ValueError("Uploaded file not found. Please analyze/upload the dataset first.")
 
@@ -340,7 +346,7 @@ def evaluate_external_predictions(task_type, actual_values, predicted_values, la
     }
 
 
-def generate_model_recommendation(task_type, rows, numeric_features, categorical_features):
+def generate_model_recommendation(task_type: str, rows: int, numeric_features: list, categorical_features: list):
     reasons = []
 
     if task_type == "classification":
@@ -385,9 +391,13 @@ def generate_model_explanation(task_type: str, algorithm: str, metrics: dict) ->
             if f1 >= 0.85:
                 explanation.append("The model performance is strong for this test split.")
             elif f1 >= 0.65:
-                explanation.append("The model performance is moderate and may improve with more data or tuning.")
+                explanation.append(
+                    "The model performance is moderate and may improve with more data or tuning."
+                )
             else:
-                explanation.append("The model performance is weak. Data quality, class imbalance, or feature quality may be issues.")
+                explanation.append(
+                    "The model performance is weak. Data quality, class imbalance, or feature quality may be issues."
+                )
 
     else:
         r2 = metrics.get("r2_score")
@@ -401,7 +411,9 @@ def generate_model_explanation(task_type: str, algorithm: str, metrics: dict) ->
             elif r2 >= 0.5:
                 explanation.append("The model explains a moderate amount of target variance.")
             else:
-                explanation.append("The model has limited predictive strength on this test split.")
+                explanation.append(
+                    "The model has limited predictive strength on this test split."
+                )
 
     return explanation
 
@@ -455,7 +467,9 @@ def train_model_from_file(
     target_column: str,
     algorithm: str,
     test_size: float = 0.2,
-) -> dict:
+    dataset_id: str = None,
+):
+    # Prepare data
     data = prepare_ml_data(file_path, target_column, test_size)
 
     task_type = data["task_type"]
@@ -473,6 +487,7 @@ def train_model_from_file(
 
     metrics = evaluate_model(task_type, data["y_test"], predictions)
 
+    # Prepare metadata
     metadata = {
         "algorithm": algorithm,
         "task_type": task_type,
@@ -480,277 +495,43 @@ def train_model_from_file(
         "features_used": data["X"].columns.tolist(),
         "numeric_features": data["numeric_features"],
         "categorical_features": data["categorical_features"],
-        "label_mapping": data["label_mapping"],
+        "label_mapping": data.get("label_mapping"),
         "test_size": float(test_size),
+        "rows_used": int(data["X"].shape[0]),
+        "dataset_id": dataset_id,  # Store dataset ID for lineage
     }
 
+    # Save model
     model_id = save_trained_model(pipeline, metadata)
 
+    # Log experiment
+    experiment_id = log_experiment(
+        dataset_id=dataset_id,
+        algorithm=algorithm,
+        hyperparameters=getattr(model, 'get_params', lambda: {})(),
+        metrics=metrics,
+        model_id=model_id,
+        notes=f"Trained on {metadata['rows_used']} rows",
+    )
+
+    # Prepare result
     result = {
         "model_id": model_id,
         "task_type": task_type,
         "algorithm": algorithm,
         "target_column": target_column,
-        "rows_used": int(len(data["X"])),
-        "train_rows": int(len(data["X_train"])),
-        "test_rows": int(len(data["X_test"])),
-        "features_used": data["X"].columns.tolist(),
-        "numeric_features": data["numeric_features"],
-        "categorical_features": data["categorical_features"],
-        "dropped_high_cardinality_columns": data["high_cardinality_cols"],
-        "test_size": float(test_size),
         "metrics": metrics,
-        "label_mapping": data["label_mapping"],
-        "warnings": [],
-        "model_recommendation": generate_model_recommendation(
-            task_type,
-            len(data["X"]),
-            data["numeric_features"],
-            data["categorical_features"],
-        ),
         "model_explanation": generate_model_explanation(task_type, algorithm, metrics),
         "feature_importance": extract_feature_importance(pipeline),
+        "training_details": {
+            "target": metadata["target_column"],
+            "train_rows": int(data["y_train"].shape[0]),
+            "test_rows": int(data["y_test"].shape[0]),
+            "numeric_features": list(data["numeric_features"]),
+            "categorical_features": list(data["categorical_features"]),
+            "dropped_high_cardinality_columns": data["high_cardinality_cols"],
+        },
+        "experiment_id": experiment_id,  # Include experiment ID in response
     }
-
-    if len(data["X"]) < 100:
-        result["warnings"].append(
-            "Dataset is small. Model metrics may not be reliable and overfitting risk is high."
-        )
-
-    result["warnings"].append(
-        "Trained model has been saved and can be used in Prediction Studio."
-    )
 
     return result
-
-
-def compare_models_from_file(
-    file_path: str,
-    target_column: str,
-    test_size: float = 0.2,
-) -> dict:
-    data = prepare_ml_data(file_path, target_column, test_size)
-
-    task_type = data["task_type"]
-
-    max_compare_rows = 800
-
-    X_full = data["X"].copy()
-    y_full = pd.Series(data["y"], index=X_full.index)
-
-    if len(X_full) > max_compare_rows:
-        sampled_indices = X_full.sample(n=max_compare_rows, random_state=42).index
-        X_used = X_full.loc[sampled_indices]
-        y_used = y_full.loc[sampled_indices]
-    else:
-        X_used = X_full
-        y_used = y_full
-
-    stratify_value = None
-
-    if task_type == "classification":
-        unique_classes, class_counts = np.unique(y_used, return_counts=True)
-
-        if len(unique_classes) > 1 and class_counts.min() >= 2:
-            stratify_value = y_used
-
-    X_train, X_test, y_train, y_test = train_test_split(
-        X_used,
-        y_used,
-        test_size=test_size,
-        random_state=42,
-        stratify=stratify_value,
-    )
-
-    if task_type == "classification":
-        models = {
-            "logistic_regression": LogisticRegression(max_iter=500),
-            "decision_tree": DecisionTreeClassifier(max_depth=8, random_state=42),
-            "random_forest_fast": RandomForestClassifier(
-                n_estimators=40,
-                max_depth=10,
-                random_state=42,
-                n_jobs=-1,
-            ),
-            "extra_trees_fast": ExtraTreesClassifier(
-                n_estimators=40,
-                max_depth=10,
-                random_state=42,
-                n_jobs=-1,
-            ),
-        }
-    else:
-        models = {
-            "linear_regression": LinearRegression(),
-            "ridge": Ridge(alpha=1.0),
-            "decision_tree": DecisionTreeRegressor(max_depth=8, random_state=42),
-            "random_forest_fast": RandomForestRegressor(
-                n_estimators=40,
-                max_depth=10,
-                random_state=42,
-                n_jobs=-1,
-            ),
-            "extra_trees_fast": ExtraTreesRegressor(
-                n_estimators=40,
-                max_depth=10,
-                random_state=42,
-                n_jobs=-1,
-            ),
-        }
-
-    leaderboard = []
-
-    for algorithm, model in models.items():
-        try:
-            pipeline = Pipeline(
-                steps=[
-                    ("preprocessor", data["preprocessor"]),
-                    ("model", model),
-                ]
-            )
-
-            pipeline.fit(X_train, y_train)
-            predictions = pipeline.predict(X_test)
-
-            metrics = evaluate_model(task_type, y_test, predictions)
-
-            if task_type == "classification":
-                score = metrics["f1_weighted"]
-            else:
-                score = metrics["r2_score"]
-
-            leaderboard.append(
-                {
-                    "algorithm": algorithm,
-                    "score": score,
-                    "metrics": metrics,
-                }
-            )
-
-        except Exception as e:
-            leaderboard.append(
-                {
-                    "algorithm": algorithm,
-                    "score": None,
-                    "error": str(e),
-                    "metrics": {},
-                }
-            )
-
-    valid_results = [item for item in leaderboard if item["score"] is not None]
-    failed_results = [item for item in leaderboard if item["score"] is None]
-
-    valid_results = sorted(valid_results, key=lambda x: x["score"], reverse=True)
-    final_leaderboard = valid_results + failed_results
-
-    best_model = valid_results[0]["algorithm"] if valid_results else None
-
-    warnings = [
-        "AutoML Compare uses lightweight demo models for fast execution.",
-        "Heavy models like SVM and KNN are excluded from AutoML Compare to prevent timeout.",
-    ]
-
-    if len(X_full) > max_compare_rows:
-        warnings.append(
-            f"Dataset has {len(X_full)} rows. AutoML used a {max_compare_rows}-row sample for speed."
-        )
-
-    return {
-        "task_type": task_type,
-        "target_column": target_column,
-        "test_size": float(test_size),
-        "best_model": best_model,
-        "ranking_metric": "f1_weighted" if task_type == "classification" else "r2_score",
-        "leaderboard": final_leaderboard,
-        "rows_used": int(len(X_full)),
-        "rows_used_for_compare": int(len(X_used)),
-        "train_rows": int(len(X_train)),
-        "test_rows": int(len(X_test)),
-        "warnings": warnings,
-        "model_recommendation": generate_model_recommendation(
-            task_type,
-            len(X_full),
-            data["numeric_features"],
-            data["categorical_features"],
-        ),
-    }
-
-
-def predict_with_saved_model(model_id: str, test_file_path: str) -> dict:
-    model_path = os.path.join(MODEL_DIR, model_id)
-
-    if not os.path.exists(model_path):
-        raise ValueError("Saved model not found. Train a model first.")
-
-    if not os.path.exists(test_file_path):
-        raise ValueError("Test file not found.")
-
-    artifact = joblib.load(model_path)
-
-    pipeline = artifact["pipeline"]
-    metadata = artifact["metadata"]
-
-    target_column = metadata["target_column"]
-    task_type = metadata["task_type"]
-    features_used = metadata["features_used"]
-    label_mapping = metadata.get("label_mapping")
-
-    test_df = read_uploaded_file(test_file_path)
-    test_df.columns = [str(col).strip() for col in test_df.columns]
-
-    missing_features = [col for col in features_used if col not in test_df.columns]
-
-    if missing_features:
-        raise ValueError(
-            f"Test data is missing required feature columns: {missing_features}"
-        )
-
-    X_new = test_df[features_used].copy()
-
-    raw_predictions = pipeline.predict(X_new)
-
-    output_df = test_df.copy()
-
-    prediction_column = f"predicted_{target_column}"
-
-    if task_type == "classification":
-        final_predictions = decode_classification_predictions(raw_predictions, label_mapping)
-        output_df[prediction_column] = final_predictions
-    else:
-        output_df[prediction_column] = raw_predictions
-
-    external_metrics = None
-
-    if target_column in test_df.columns:
-        actual_values = test_df[target_column]
-
-        external_metrics = evaluate_external_predictions(
-            task_type=task_type,
-            actual_values=actual_values,
-            predicted_values=raw_predictions,
-            label_mapping=label_mapping,
-        )
-
-    prediction_filename = f"predictions_{uuid.uuid4().hex[:8]}.csv"
-    prediction_path = os.path.join(PREDICTION_DIR, prediction_filename)
-
-    output_df.to_csv(prediction_path, index=False)
-
-    preview = (
-        output_df.head(10)
-        .replace([np.inf, -np.inf], np.nan)
-        .fillna("")
-        .to_dict(orient="records")
-    )
-
-    return {
-        "model_id": model_id,
-        "task_type": task_type,
-        "target_column": target_column,
-        "prediction_column": prediction_column,
-        "prediction_filename": prediction_filename,
-        "rows_predicted": int(len(output_df)),
-        "preview": preview,
-        "external_test_metrics": external_metrics,
-        "message": "Predictions generated successfully.",
-    }

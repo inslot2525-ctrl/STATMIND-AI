@@ -5,6 +5,7 @@ import traceback
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 
 from services.analysis_engine import analyze_file
+from services.dataset_registry import register_dataset
 
 router = APIRouter()
 
@@ -39,6 +40,10 @@ async def analyze_dataset(
         print("File saved at:", file_path)
         print("Starting analysis...")
 
+        # REGISTER DATASET
+        dataset_id = register_dataset(file_path, file.filename)
+        print(f"Registered dataset with ID: {dataset_id}")
+
         result = analyze_file(file_path, domain)
 
         print("Analysis completed.")
@@ -46,6 +51,7 @@ async def analyze_dataset(
         print("Columns:", result.get("columns"))
 
         result["filename"] = safe_filename
+        result["dataset_id"] = dataset_id  # ADD DATASET ID TO RESULT
 
         return result
 

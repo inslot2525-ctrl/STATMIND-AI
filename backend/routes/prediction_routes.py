@@ -5,6 +5,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
 
 from services.ml_engine import predict_with_saved_model
+from services.dataset_registry import get_dataset
 
 router = APIRouter()
 
@@ -19,6 +20,7 @@ os.makedirs(PREDICTION_DIR, exist_ok=True)
 async def predict_test_data(
     model_id: str = Form(...),
     file: UploadFile = File(...),
+    dataset_id: str = Form(None),  # Optional dataset_id for tracking
 ):
     try:
         filename = file.filename
@@ -38,6 +40,8 @@ async def predict_test_data(
         with open(test_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
+        # Note: For predictions, we don't strictly need dataset_id since we're using a test file
+        # But we could log it for audit purposes if needed
         result = predict_with_saved_model(
             model_id=model_id,
             test_file_path=test_file_path,

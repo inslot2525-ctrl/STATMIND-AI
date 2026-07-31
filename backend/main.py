@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from routes.analysis_routes import router as analysis_router
 from routes.target_routes import router as target_router
-from routes.ml_routes import router as ml_router
+from routes.ml_routes import router as ml_router, model_router, experiment_router
 from routes.prediction_routes import router as prediction_router
 from routes.intelligence_routes import router as intelligence_router
 
@@ -27,6 +27,8 @@ app.add_middleware(
 app.include_router(analysis_router, prefix="/api", tags=["Analysis"])
 app.include_router(target_router, prefix="/api", tags=["Target Advisor"])
 app.include_router(ml_router, prefix="/api", tags=["Machine Learning"])
+app.include_router(experiment_router, prefix="/api", tags=["Experiments"])
+app.include_router(model_router, prefix="/api", tags=["Model Registry"])
 app.include_router(prediction_router, prefix="/api", tags=["Prediction Studio"])
 app.include_router(intelligence_router, prefix="/api", tags=["Intelligence Center"])
 
@@ -45,5 +47,8 @@ def root():
             "Leakage Detector",
             "AI Data Scientist Chatbot",
             "Document Generator",
+            "Dataset Versioning",
+            "Experiment Tracking",
+            "Model Registry",
         ],
     }
