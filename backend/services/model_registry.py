@@ -4,8 +4,8 @@ import joblib
 from datetime import datetime
 from pathlib import Path
 
-MODEL_DIR = "saved_models"
-MODEL_REGISTRY_PATH = "model_registry.json"
+MODEL_DIR = "models"
+MODEL_REGISTRY_PATH = "registry/model_registry.json"
 
 def _load_registry():
     if not os.path.exists(MODEL_REGISTRY_PATH):
