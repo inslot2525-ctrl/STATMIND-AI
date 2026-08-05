@@ -36,6 +36,82 @@
           "transitioned_at": "2026-07-31T17:53:29.033068"
         }
       ]
+    },
+    "random_forest_predicted_Tx_Amount_c8a0b601.pkl": {
+      "model_id": "random_forest_predicted_Tx_Amount_c8a0b601.pkl",
+      "registered_at": "2026-08-05T09:36:00.171713",
+      "updated_at": "2026-08-05T09:36:00.171713",
+      "metadata": {
+        "algorithm": "random_forest",
+        "task_type": "regression",
+        "target_column": "predicted_Tx_Amount",
+        "features_used": [
+          "Sender_ID",
+          "Receiver_Acct",
+          "Tx_Amount"
+        ],
+        "numeric_features": [
+          "Tx_Amount"
+        ],
+        "categorical_features": [
+          "Sender_ID",
+          "Receiver_Acct"
+        ],
+        "label_mapping": null,
+        "test_size": 0.2,
+        "model_id": "random_forest_predicted_Tx_Amount_c8a0b601.pkl",
+        "metrics": {
+          "mae": 619.4759,
+          "rmse": 1250.1199,
+          "r2_score": -867.7111
+        },
+        "dataset_id": "3"
+      },
+      "versions": [
+        {
+          "version": "1.0.0",
+          "stage": "development",
+          "registered_at": "2026-08-05T09:36:00.171713"
+        }
+      ]
+    },
+    "random_forest_Tx_Amount_5b709a99.pkl": {
+      "model_id": "random_forest_Tx_Amount_5b709a99.pkl",
+      "registered_at": "2026-08-05T09:40:07.329377",
+      "updated_at": "2026-08-05T09:40:07.329377",
+      "metadata": {
+        "algorithm": "random_forest",
+        "task_type": "regression",
+        "target_column": "Tx_Amount",
+        "features_used": [
+          "Sender_ID",
+          "Receiver_Acct",
+          "predicted_Tx_Amount"
+        ],
+        "numeric_features": [
+          "predicted_Tx_Amount"
+        ],
+        "categorical_features": [
+          "Sender_ID",
+          "Receiver_Acct"
+        ],
+        "label_mapping": null,
+        "test_size": 0.2,
+        "model_id": "random_forest_Tx_Amount_5b709a99.pkl",
+        "metrics": {
+          "mae": 1510.4264,
+          "rmse": 2474.8367,
+          "r2_score": -0.5645
+        },
+        "dataset_id": "3"
+      },
+      "versions": [
+        {
+          "version": "1.0.0",
+          "stage": "development",
+          "registered_at": "2026-08-05T09:40:07.329377"
+        }
+      ]
     }
   },
   "next_version": 1

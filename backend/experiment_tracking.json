@@ -21,7 +21,51 @@
       "model_id": "random_forest_Tx_Amount_ea3a1266.pkl",
       "tags": [],
       "notes": ""
+    },
+    "2": {
+      "id": "2",
+      "timestamp": "2026-08-05T09:36:00.171713",
+      "dataset_id": "3",
+      "dataset_info": {
+        "filename": "predictions_9aa411de.csv",
+        "rows": 23,
+        "columns": 4
+      },
+      "algorithm": "random_forest",
+      "hyperparameters": {
+        "test_size": 0.2
+      },
+      "metrics": {
+        "mae": 619.4759,
+        "rmse": 1250.1199,
+        "r2_score": -867.7111
+      },
+      "model_id": "random_forest_predicted_Tx_Amount_c8a0b601.pkl",
+      "tags": [],
+      "notes": ""
+    },
+    "3": {
+      "id": "3",
+      "timestamp": "2026-08-05T09:40:07.329377",
+      "dataset_id": "3",
+      "dataset_info": {
+        "filename": "predictions_9aa411de.csv",
+        "rows": 23,
+        "columns": 4
+      },
+      "algorithm": "random_forest",
+      "hyperparameters": {
+        "test_size": 0.2
+      },
+      "metrics": {
+        "mae": 1510.4264,
+        "rmse": 2474.8367,
+        "r2_score": -0.5645
+      },
+      "model_id": "random_forest_Tx_Amount_5b709a99.pkl",
+      "tags": [],
+      "notes": ""
     }
   },
-  "next_id": 2
+  "next_id": 4
 }

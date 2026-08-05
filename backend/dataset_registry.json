@@ -23,7 +23,19 @@
       "missing_cells": 0,
       "duplicate_rows": 0,
       "file_path": "uploads\\Credit_Card_Applications.csv"
+    },
+    "3": {
+      "id": "3",
+      "content_hash": "c6089232fc82d826f472c16d19380b4cbc15488142d09e82e5ca1716db23f485",
+      "original_filename": "predictions_9aa411de.csv",
+      "stored_filename": "predictions_9aa411de.csv",
+      "upload_time": "2026-08-05T09:35:42.005569",
+      "rows": 23,
+      "columns": 4,
+      "missing_cells": 0,
+      "duplicate_rows": 0,
+      "file_path": "uploads\\predictions_9aa411de.csv"
     }
   },
-  "next_id": 3
+  "next_id": 4
 }
