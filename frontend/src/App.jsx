@@ -1548,17 +1548,17 @@ function App() {
 
   return (
     <div className="shell">
-      <aside className="sidebar">
+      <header className="topbar">
         <div className="brand">
           <div className="brand-icon">S</div>
 
           <div>
-            <h1>StatMind AI</h1>
+            <h1>STATMIND</h1>
             <p>Data Intelligence OS</p>
           </div>
         </div>
 
-        <nav className="side-nav">
+        <nav className="top-nav">
           {[
             ["dashboard", "Dashboard"],
             ["statistics", "Statistics Studio"],
@@ -1581,7 +1581,7 @@ function App() {
             </button>
           ))}
         </nav>
-      </aside>
+      </header>
 
       <main className="main">
         {currentPage === "dashboard" && <Dashboard />}
