@@ -62,26 +62,26 @@ function App() {
   const [stageLoading, setStageLoading] = useState({});
 
   const pieColors = [
-    "#f0b429",
-    "#e07a2d",
-    "#fbd38d",
-    "#c98a2d",
-    "#facc15",
-    "#b45309",
-    "#fde68a",
-    "#a3762a",
+    "#e5e5e5",
+    "#a3a3a3",
+    "#ffffff",
+    "#737373",
+    "#d4d4d4",
+    "#525252",
+    "#f5f5f5",
+    "#404040",
   ];
 
   const tooltipProps = {
     contentStyle: {
-      background: "#0d0b08",
-      border: "1px solid rgba(240, 180, 41, 0.3)",
+      background: "#0a0a0a",
+      border: "1px solid rgba(255, 255, 255, 0.12)",
       borderRadius: 12,
       boxShadow: "0 12px 32px rgba(0, 0, 0, 0.6)",
     },
-    labelStyle: { color: "#fbd38d", fontWeight: 700 },
+    labelStyle: { color: "#ffffff", fontWeight: 700 },
     itemStyle: { color: "#f5efe0" },
-    cursor: { fill: "rgba(240, 180, 41, 0.06)" },
+    cursor: { fill: "rgba(255, 255, 255, 0.04)" },
   };
 
   const analyze = async () => {
@@ -1353,14 +1353,14 @@ function App() {
 
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={chart.data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2b2416" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
             <XAxis
               dataKey={chart.x_axis}
-              tick={{ fontSize: 11, fill: "#cfc4a9" }}
+              tick={{ fontSize: 11, fill: "#a3a3a3" }}
             />
-            <YAxis tick={{ fontSize: 11, fill: "#cfc4a9" }} />
+            <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
             <Tooltip {...tooltipProps} />
-            <Bar dataKey={chart.y_axis} radius={[8, 8, 0, 0]} fill="#f0b429" />
+            <Bar dataKey={chart.y_axis} radius={[8, 8, 0, 0]} fill="#e5e5e5" />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -1377,17 +1377,17 @@ function App() {
 
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={chart.data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2b2416" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
             <XAxis
               dataKey={chart.x_axis}
-              tick={{ fontSize: 11, fill: "#cfc4a9" }}
+              tick={{ fontSize: 11, fill: "#a3a3a3" }}
             />
-            <YAxis tick={{ fontSize: 11, fill: "#cfc4a9" }} />
+            <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
             <Tooltip {...tooltipProps} />
             <Line
               type="monotone"
               dataKey={chart.y_axis}
-              stroke="#c98a2d"
+              stroke="#737373"
               strokeWidth={3}
               dot
             />
@@ -1407,18 +1407,18 @@ function App() {
 
         <ResponsiveContainer width="100%" height={280}>
           <AreaChart data={chart.data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2b2416" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
             <XAxis
               dataKey={chart.x_axis}
-              tick={{ fontSize: 11, fill: "#cfc4a9" }}
+              tick={{ fontSize: 11, fill: "#a3a3a3" }}
             />
-            <YAxis tick={{ fontSize: 11, fill: "#cfc4a9" }} />
+            <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
             <Tooltip {...tooltipProps} />
             <Area
               type="monotone"
               dataKey={chart.y_axis}
-              stroke="#f0b429"
-              fill="#f0b429"
+              stroke="#e5e5e5"
+              fill="#e5e5e5"
               fillOpacity={0.25}
             />
           </AreaChart>
@@ -1466,14 +1466,14 @@ function App() {
 
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={chart.data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2b2416" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
             <XAxis
               dataKey="range"
-              tick={{ fontSize: 10, fill: "#cfc4a9" }}
+              tick={{ fontSize: 10, fill: "#a3a3a3" }}
             />
-            <YAxis tick={{ fontSize: 11, fill: "#cfc4a9" }} />
+            <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
             <Tooltip {...tooltipProps} />
-            <Bar dataKey="count" radius={[8, 8, 0, 0]} fill="#e07a2d" />
+            <Bar dataKey="count" radius={[8, 8, 0, 0]} fill="#a3a3a3" />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -1490,20 +1490,20 @@ function App() {
 
         <ResponsiveContainer width="100%" height={280}>
           <ScatterChart>
-            <CartesianGrid stroke="#2b2416" />
+            <CartesianGrid stroke="#262626" />
             <XAxis
               type="number"
               dataKey={chart.x_axis}
               name={chart.x_axis}
-              tick={{ fontSize: 11, fill: "#cfc4a9" }}
+              tick={{ fontSize: 11, fill: "#a3a3a3" }}
             />
             <YAxis
               type="number"
               dataKey={chart.y_axis}
               name={chart.y_axis}
-              tick={{ fontSize: 11, fill: "#cfc4a9" }}
+              tick={{ fontSize: 11, fill: "#a3a3a3" }}
             />
-            <Tooltip {...tooltipProps} cursor={{ stroke: "rgba(240, 180, 41, 0.4)", strokeDasharray: "3 3" }} />
+            <Tooltip {...tooltipProps} cursor={{ stroke: "rgba(255, 255, 255, 0.25)", strokeDasharray: "3 3" }} />
             <Scatter data={chart.data} fill="#22c55e" />
           </ScatterChart>
         </ResponsiveContainer>
@@ -1529,7 +1529,7 @@ function App() {
 
             const background =
               cell.value >= 0
-                ? `rgba(240, 180, 41, ${0.12 + intensity * 0.55})`
+                ? `rgba(255, 255, 255, ${0.12 + intensity * 0.55})`
                 : `rgba(224, 122, 45, ${0.12 + intensity * 0.55})`;
 
             return (
