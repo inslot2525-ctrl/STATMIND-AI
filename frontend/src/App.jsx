@@ -620,9 +620,9 @@ function App() {
   const Dashboard = () => (
     <section>
       <div className="hero">
-        <p className="eyebrow">Welcome to StatMind AI</p>
-        <h2>Your explainable data science command center.</h2>
-        <p>
+        <h1 className="wordmark">STATMIND</h1>
+        <p className="hero-tagline">Your explainable data science command center.</p>
+        <p className="hero-sub">
           Upload datasets, generate statistics, detect schema, produce charts,
           and prepare the dataset for machine learning.
         </p>
