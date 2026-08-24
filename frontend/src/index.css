@@ -12,8 +12,8 @@
     rgba(0, 0, 0, 0.5) 0 10px 15px -3px, rgba(0, 0, 0, 0.3) 0 4px 6px -2px;
 
   --sans: 'Outfit', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: 'Cinzel', Georgia, serif;
-  --mono: ui-monospace, Consolas, monospace;
+  --heading: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  --mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Consolas, monospace;
 
   color-scheme: dark;
   font: 18px/145% var(--sans);

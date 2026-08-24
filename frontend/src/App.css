@@ -17,7 +17,7 @@
   --yellow: #facc15;
   --danger: #f43f5e;
   --sans: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --display: 'Cinzel', Georgia, serif;
+  --display: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 * {
@@ -550,17 +550,18 @@ button:disabled {
 
 .page-header h2 {
   font-family: var(--display);
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
+  font-weight: 700;
 }
 
 .wordmark {
   margin: 8px 0 14px;
   font-family: var(--display);
-  font-size: clamp(46px, 7.5vw, 96px);
+  font-size: clamp(42px, 7vw, 88px);
   font-weight: 700;
   line-height: 1;
-  letter-spacing: 0.18em;
-  text-indent: 0.18em;
+  letter-spacing: 0.02em;
+  text-indent: 0;
   background: linear-gradient(160deg, #fde68a 10%, #f0b429 45%, #c98a2d 75%, #fbd38d 100%);
   -webkit-background-clip: text;
   background-clip: text;
