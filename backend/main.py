@@ -13,16 +13,26 @@ app = FastAPI(
     version="1.0.0",
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+import os
+
+# Allow Vercel frontend + local dev. Set ALLOWED_ORIGINS env as comma-separated list to override.
+_allowed = os.getenv("ALLOWED_ORIGINS", "")
+if _allowed:
+    _origins = [o.strip() for o in _allowed.split(",") if o.strip()]
+else:
+    _origins = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5174",
         "http://localhost:5175",
         "http://127.0.0.1:5175",
-    ],
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
