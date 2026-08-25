@@ -1,20 +1,30 @@
 import os
 import json
-import uuid
 from datetime import datetime
-from mlops.dataset_versioning import get_dataset
+from services.dataset_registry import get_dataset
+from database import SessionLocal, Experiment, init_db
 
-EXPERIMENT_TRACKING_PATH = "experiment_tracking.json"
+init_db()
 
-def _load_tracking():
-    if not os.path.exists(EXPERIMENT_TRACKING_PATH):
-        return {"experiments": {}, "next_id": 1}
-    with open(EXPERIMENT_TRACKING_PATH, 'r') as f:
-        return json.load(f)
+def _next_id(db):
+    ids = [int(r.id) for r in db.query(Experiment.id).all() if r.id.isdigit()]
+    return str(max(ids) + 1) if ids else "1"
 
-def _save_tracking(data):
-    with open(EXPERIMENT_TRACKING_PATH, 'w') as f:
-        json.dump(data, f, indent=2, default=str)
+def _to_dict(obj):
+    if not obj:
+        return None
+    return {
+        "id": obj.id,
+        "timestamp": obj.timestamp,
+        "dataset_id": obj.dataset_id,
+        "dataset_info": json.loads(obj.dataset_info) if obj.dataset_info else {},
+        "algorithm": obj.algorithm,
+        "hyperparameters": json.loads(obj.hyperparameters) if obj.hyperparameters else {},
+        "metrics": json.loads(obj.metrics) if obj.metrics else {},
+        "model_id": obj.model_id,
+        "tags": json.loads(obj.tags) if obj.tags else [],
+        "notes": obj.notes or "",
+    }
 
 def log_experiment(
     dataset_id,
@@ -29,54 +39,59 @@ def log_experiment(
     Log an ML experiment.
     Returns experiment_id.
     """
-    # Validate dataset exists
     dataset_info = get_dataset(dataset_id)
     if not dataset_info:
         raise ValueError(f"Dataset {dataset_id} not found in registry")
 
-    tracking_data = _load_tracking()
-    experiment_id = str(tracking_data["next_id"])
-    tracking_data["next_id"] += 1
-
-    experiment = {
-        "id": experiment_id,
-        "timestamp": datetime.now().isoformat(),
-        "dataset_id": dataset_id,
-        "dataset_info": {
-            "filename": dataset_info["original_filename"],
-            "rows": dataset_info.get("rows"),
-            "columns": dataset_info.get("columns")
-        },
-        "algorithm": algorithm,
-        "hyperparameters": hyperparameters or {},
-        "metrics": metrics or {},
-        "model_id": model_id,
-        "tags": tags or [],
-        "notes": notes or ""
-    }
-
-    tracking_data["experiments"][experiment_id] = experiment
-    _save_tracking(tracking_data)
-    return experiment_id
+    db = SessionLocal()
+    try:
+        experiment_id = _next_id(db)
+        exp = Experiment(
+            id=experiment_id,
+            timestamp=datetime.now().isoformat(),
+            dataset_id=str(dataset_id),
+            dataset_info=json.dumps({
+                "filename": dataset_info["original_filename"],
+                "rows": dataset_info.get("rows"),
+                "columns": dataset_info.get("columns")
+            }),
+            algorithm=algorithm,
+            hyperparameters=json.dumps(hyperparameters or {}),
+            metrics=json.dumps(metrics or {}),
+            model_id=model_id,
+            tags=json.dumps(tags or []),
+            notes=notes or ""
+        )
+        db.add(exp)
+        db.commit()
+        return experiment_id
+    finally:
+        db.close()
 
 def get_experiment(experiment_id):
-    tracking_data = _load_tracking()
-    return tracking_data["experiments"].get(experiment_id)
+    db = SessionLocal()
+    try:
+        obj = db.query(Experiment).filter_by(id=str(experiment_id)).first()
+        return _to_dict(obj)
+    finally:
+        db.close()
 
 def list_experiments(dataset_id=None, limit=50):
-    tracking_data = _load_tracking()
-    experiments = list(tracking_data["experiments"].values())
-
-    if dataset_id:
-        experiments = [exp for exp in experiments if exp["dataset_id"] == dataset_id]
-
-    # Sort by timestamp descending
-    experiments.sort(key=lambda x: x["timestamp"], reverse=True)
-    return experiments[:limit]
+    db = SessionLocal()
+    try:
+        q = db.query(Experiment)
+        if dataset_id:
+            q = q.filter_by(dataset_id=str(dataset_id))
+        # SQLite string timestamp ISO sorts lexicographically same as chronological
+        objs = q.order_by(Experiment.timestamp.desc()).limit(limit).all()
+        return [_to_dict(o) for o in objs]
+    finally:
+        db.close()
 
 def get_experiments_for_model(model_id):
-    tracking_data = _load_tracking()
-    return [
-        exp for exp in tracking_data["experiments"].values()
-        if exp.get("model_id") == model_id
-    ]
+    db = SessionLocal()
+    try:
+        objs = db.query(Experiment).filter_by(model_id=model_id).all()
+        return [_to_dict(o) for o in objs]
+    finally:
+        db.close()

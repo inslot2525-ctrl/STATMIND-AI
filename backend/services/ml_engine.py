@@ -5,8 +5,8 @@ import pandas as pd
 import numpy as np
 
 from services.file_reader import read_uploaded_file
-from mlops.experiment_tracker import log_experiment
-from mlops.model_registry import register_model
+from services.experiment_tracker import log_experiment
+from services.model_registry import register_model
 
 from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer

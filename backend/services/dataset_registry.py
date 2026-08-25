@@ -1,21 +1,12 @@
 import os
-import json
 import hashlib
+import json
 from datetime import datetime
 from services.file_reader import read_uploaded_file
+from database import SessionLocal, Dataset, init_db
 
-DATASET_REGISTRY_PATH = "datasets/dataset_registry.json"
-DATASETS_DIR = "uploads"
-
-def _load_registry():
-    if not os.path.exists(DATASET_REGISTRY_PATH):
-        return {"datasets": {}, "next_id": 1}
-    with open(DATASET_REGISTRY_PATH, 'r') as f:
-        return json.load(f)
-
-def _save_registry(data):
-    with open(DATASET_REGISTRY_PATH, 'w') as f:
-        json.dump(data, f, indent=2, default=str)
+# Ensure DB and tables exist
+init_db()
 
 def _calculate_file_hash(filepath):
     """Calculate SHA256 hash of file content"""
@@ -25,81 +16,94 @@ def _calculate_file_hash(filepath):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest()
 
+def _next_id(db):
+    ids = [int(r.id) for r in db.query(Dataset.id).all() if r.id.isdigit()]
+    return str(max(ids) + 1) if ids else "1"
+
+def _to_dict(obj):
+    if not obj:
+        return None
+    return {
+        "id": obj.id,
+        "content_hash": obj.content_hash,
+        "original_filename": obj.original_filename,
+        "stored_filename": obj.stored_filename,
+        "upload_time": obj.upload_time,
+        "rows": obj.rows,
+        "columns": obj.columns,
+        "missing_cells": obj.missing_cells,
+        "duplicate_rows": obj.duplicate_rows,
+        "file_path": obj.file_path,
+        "error": obj.error,
+    }
+
 def register_dataset(file_path, original_filename):
     """
     Register a dataset in the registry, returning dataset_id.
     If identical content exists, returns existing ID.
     """
-    # Calculate content hash
     file_hash = _calculate_file_hash(file_path)
-
-    # Load registry
-    registry = _load_registry()
-
-    # Check if we've seen this exact content before
-    for data_id, data_info in registry["datasets"].items():
-        if data_info.get("content_hash") == file_hash:
-            return data_id  # Return existing ID
-
-    # Register new dataset
-    dataset_id = str(registry["next_id"])
-    registry["next_id"] += 1
-
-    # Read dataset to get metadata
+    db = SessionLocal()
     try:
-        df = read_uploaded_file(file_path)
-        rows, cols = df.shape
+        # Check dedup
+        existing = db.query(Dataset).filter_by(content_hash=file_hash).first()
+        if existing:
+            return existing.id
 
-        # Basic stats for quick reference
-        missing_count = int(df.isna().sum().sum())
-        duplicate_rows = int(df.duplicated().sum())
+        dataset_id = _next_id(db)
 
-        dataset_info = {
-            "id": dataset_id,
-            "content_hash": file_hash,
-            "original_filename": original_filename,
-            "stored_filename": os.path.basename(file_path),
-            "upload_time": datetime.now().isoformat(),
-            "rows": rows,
-            "columns": cols,
-            "missing_cells": missing_count,
-            "duplicate_rows": duplicate_rows,
-            "file_path": file_path
-        }
+        # Read dataset to get metadata
+        try:
+            df = read_uploaded_file(file_path)
+            rows, cols = df.shape
+            missing_count = int(df.isna().sum().sum())
+            duplicate_rows = int(df.duplicated().sum())
+            error = None
+        except Exception as e:
+            rows = cols = missing_count = duplicate_rows = None
+            error = str(e)
 
-        registry["datasets"][dataset_id] = dataset_info
-        _save_registry(registry)
+        ds = Dataset(
+            id=dataset_id,
+            content_hash=file_hash,
+            original_filename=original_filename,
+            stored_filename=os.path.basename(file_path),
+            upload_time=datetime.now().isoformat(),
+            rows=rows,
+            columns=cols,
+            missing_cells=missing_count,
+            duplicate_rows=duplicate_rows,
+            file_path=file_path,
+            error=error
+        )
+        db.add(ds)
+        db.commit()
         return dataset_id
-
-    except Exception as e:
-        # If we can't read the file, still register basic info
-        dataset_info = {
-            "id": dataset_id,
-            "content_hash": file_hash,
-            "original_filename": original_filename,
-            "stored_filename": os.path.basename(file_path),
-            "upload_time": datetime.now().isoformat(),
-            "error": str(e),
-            "file_path": file_path
-        }
-        registry["datasets"][dataset_id] = dataset_info
-        _save_registry(registry)
-        return dataset_id
+    finally:
+        db.close()
 
 def get_dataset(dataset_id):
     """Get dataset metadata by ID"""
-    registry = _load_registry()
-    return registry["datasets"].get(dataset_id)
+    db = SessionLocal()
+    try:
+        obj = db.query(Dataset).filter_by(id=str(dataset_id)).first()
+        return _to_dict(obj)
+    finally:
+        db.close()
 
 def list_datasets():
     """List all registered datasets"""
-    registry = _load_registry()
-    return list(registry["datasets"].values())
+    db = SessionLocal()
+    try:
+        return [_to_dict(o) for o in db.query(Dataset).all()]
+    finally:
+        db.close()
 
 def get_dataset_by_hash(file_hash):
     """Find dataset by content hash"""
-    registry = _load_registry()
-    for data_id, data_info in registry["datasets"].items():
-        if data_info.get("content_hash") == file_hash:
-            return data_info
-    return None
+    db = SessionLocal()
+    try:
+        obj = db.query(Dataset).filter_by(content_hash=file_hash).first()
+        return _to_dict(obj)
+    finally:
+        db.close()

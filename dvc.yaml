@@ -1,0 +1,22 @@
+stages:
+  data_ingest:
+    desc: "Version datasets uploaded via /api/analyze - tracked in SQLite + DVC remote"
+    cmd: cd backend && python -c "from database import init_db; init_db(); print('DB migrated')"
+    deps:
+      - backend/services/dataset_registry.py
+      - backend/database.py
+    outs:
+      - backend/statmind.db:
+          cache: false
+          persist: true
+
+  train:
+    desc: "Train models - artifacts versioned via DVC, metrics in experiment_tracking"
+    cmd: cd backend && python -c "from services.ml_engine import get_available_models; print(get_available_models())"
+    deps:
+      - backend/services/ml_engine.py
+      - backend/services/experiment_tracker.py
+      - backend/services/model_registry.py
+    outs:
+      - backend/models:
+          persist: true
