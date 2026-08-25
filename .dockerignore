@@ -1,0 +1,13 @@
+.git
+.gitignore
+node_modules
+backend/__pycache__
+backend/*.pyc
+frontend/node_modules
+frontend/dist
+.dvc
+.dvcstore
+backend/statmind.db
+backend/statmind.db-journal
+*.log
+.DS_Store

@@ -56,3 +56,20 @@ def root():
             "Model Registry",
         ],
     }
+
+
+@app.get("/api/health")
+def health():
+    """Health check with DB connectivity."""
+    try:
+        from sqlalchemy import text
+        from database import SessionLocal
+
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        db_status = "ok"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    status = "ok" if db_status == "ok" else "degraded"
+    return {"status": status, "database": db_status, "version": "1.0.0"}

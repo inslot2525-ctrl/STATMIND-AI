@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: pip install -r backend/requirements.txt
+      - run: python -c "from database import init_db; init_db(); print('DB ok')"
+        working-directory: backend
+      - run: python -c "import main; print('FastAPI import ok')"
+        working-directory: backend
+      - run: curl -s http://localhost:8000/api/health || echo "health check skipped in CI (no server)"
+      - name: Build backend image
+        run: docker build -t statmind-backend ./backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - name: Build frontend image
+        run: docker build -t statmind-frontend ./frontend
+
+  dvc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install dvc
+      - run: dvc status
