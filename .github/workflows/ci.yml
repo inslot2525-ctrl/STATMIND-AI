@@ -20,6 +20,9 @@ jobs:
         working-directory: backend
       - run: python -c "import main; print('FastAPI import ok')"
         working-directory: backend
+      - name: Run benchmark tests
+        run: pytest ../tests -v -s
+        working-directory: backend
       - run: curl -s http://localhost:8000/api/health || echo "health check skipped in CI (no server)"
       - name: Build backend image
         run: docker build -t statmind-backend ./backend
