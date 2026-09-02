@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, memo, lazy, Suspense } from "react";
 import {
   BarChart,
   Bar,
@@ -660,149 +660,157 @@ function App() {
     </section>
   );
 
-  const Statistics = () => (
-    <section>
-      <Header
-        title="Statistics Studio"
-        subtitle="Profile datasets and generate visual intelligence."
-      />
+  const Statistics = () => {
+    const [chartTab, setChartTab] = useState("overview");
+    const chartCounts = useMemo(() => {
+      if (!result?.charts) return { total: 0 };
+      const c = result.charts;
+      return {
+        bar: (c.bar_charts?.length || 0) + (c.top_n_charts?.length || 0),
+        dist: (c.pie_charts?.length || 0) + (c.histograms?.length || 0),
+        trends: (c.line_charts?.length || 0) + (c.area_charts?.length || 0) + (c.scatter_plots?.length || 0),
+        corr: c.correlation_heatmap ? 1 : 0,
+        total:
+          (c.bar_charts?.length || 0) +
+          (c.pie_charts?.length || 0) +
+          (c.line_charts?.length || 0) +
+          (c.area_charts?.length || 0) +
+          (c.histograms?.length || 0) +
+          (c.scatter_plots?.length || 0) +
+          (c.top_n_charts?.length || 0) +
+          (c.correlation_heatmap ? 1 : 0),
+      };
+    }, [result]);
+    return (
+      <section>
+        <Header title="Statistics Studio" subtitle="Profile datasets and generate visual intelligence — optimized for speed." />
 
-      <div className="upload-card">
-        <div className="input-group">
-          <label>Upload Dataset</label>
-          <input
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            onChange={(e) => {
-              setFile(e.target.files[0]);
-              setResult(null);
-              setFrontendError("");
-            }}
-          />
-
-          {file && <span className="file-name">{file.name}</span>}
-        </div>
-
-        <div className="input-group">
-          <label>Analysis Domain</label>
-          <select value={domain} onChange={(e) => setDomain(e.target.value)}>
-            <option value="business">Business Analytics</option>
-            <option value="research">Research Analytics</option>
-            <option value="finance">Finance Analytics</option>
-          </select>
-        </div>
-
-        <button className="primary" onClick={analyze} disabled={loading}>
-          {loading ? "Analyzing..." : "Run Analysis"}
-        </button>
-      </div>
-
-      {frontendError && (
-        <div className="warning">
-          <h4>Frontend Error</h4>
-          <p>{frontendError}</p>
-          <p>
-            Open browser console using <strong>F12 → Console</strong> and check
-            the logs printed by the app.
-          </p>
-        </div>
-      )}
-
-      {!result && !loading && (
-        <Empty
-          title="No dataset analyzed yet."
-          text="Upload a CSV or Excel file and run analysis."
-        />
-      )}
-
-      {loading && (
-        <div className="empty">
-          <h3>Analyzing dataset...</h3>
-          <p>
-            Waiting for backend response. Since timeout is removed, this will
-            wait until backend responds.
-          </p>
-        </div>
-      )}
-
-      {result && (
-        <>
-          <div className="summary-grid">
-            <Summary label="Rows" value={result.rows} />
-            <Summary label="Columns" value={result.columns} />
-            <Summary label="Domain" value={result.domain} />
-            <Summary
-              label="Quality"
-              value={`${result.statistics?.data_quality?.data_quality_score}/100`}
-              small={result.statistics?.data_quality?.grade}
+        <div className="upload-card">
+          <div className="input-group">
+            <label>Upload Dataset</label>
+            <input
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              onChange={(e) => {
+                setFile(e.target.files[0]);
+                setResult(null);
+                setFrontendError("");
+              }}
             />
+            {file && <span className="file-name">{file.name}</span>}
           </div>
+          <div className="input-group">
+            <label>Analysis Domain</label>
+            <select value={domain} onChange={(e) => setDomain(e.target.value)}>
+              <option value="business">Business Analytics</option>
+              <option value="research">Research Analytics</option>
+              <option value="finance">Finance Analytics</option>
+            </select>
+          </div>
+          <button className="primary" onClick={analyze} disabled={loading}>
+            {loading ? "Analyzing..." : "Run Analysis"}
+          </button>
+        </div>
 
-          <Card title="Dataset Intelligence">
-            <InsightList items={result.statistics?.dataset_intelligence || []} />
-          </Card>
+        {frontendError && (
+          <div className="warning">
+            <h4>Frontend Error</h4>
+            <p>{frontendError}</p>
+            <p>Open browser console using <strong>F12 → Console</strong> and check the logs.</p>
+          </div>
+        )}
 
-          <Card title="Domain Insights">
-            <InsightList items={result.domain_insights || []} />
-          </Card>
+        {!result && !loading && <Empty title="No dataset analyzed yet." text="Upload a CSV or Excel file and run analysis. Charts are now sampled & lazy-loaded for instant display." />}
 
-          <Card title="Dynamic Charts">
-            <div className="chart-grid">
-              {result.charts?.top_n_charts?.map((chart, index) => (
-                <BarBlock chart={chart} label="Top-N" key={`top-${index}`} />
-              ))}
+        {loading && (
+          <div className="empty">
+            <h3>Analyzing dataset...</h3>
+            <p>Optimized engine: sampling large datasets, capped correlations, progressive chart loading. This now completes in seconds.</p>
+            <div className="progress-bar-skeleton"><div className="progress-bar-fill animate" /></div>
+          </div>
+        )}
 
-              {result.charts?.bar_charts?.map((chart, index) => (
-                <BarBlock chart={chart} label="Bar" key={`bar-${index}`} />
-              ))}
-
-              {result.charts?.pie_charts?.map((chart, index) => (
-                <PieBlock chart={chart} key={`pie-${index}`} />
-              ))}
-
-              {result.charts?.line_charts?.slice(0, 2).map((chart, index) => (
-                <LineBlock chart={chart} key={`line-${index}`} />
-              ))}
-
-              {result.charts?.area_charts?.slice(0, 2).map((chart, index) => (
-                <AreaBlock chart={chart} key={`area-${index}`} />
-              ))}
-
-              {result.charts?.histograms?.slice(0, 4).map((chart, index) => (
-                <HistBlock chart={chart} key={`hist-${index}`} />
-              ))}
-
-              {result.charts?.scatter_plots?.map((chart, index) => (
-                <ScatterBlock chart={chart} key={`scatter-${index}`} />
-              ))}
-
-              <Heatmap result={result} />
+        {result && (
+          <>
+            <div className="summary-grid">
+              <Summary label="Rows" value={result.rows} />
+              <Summary label="Columns" value={result.columns} />
+              <Summary label="Domain" value={result.domain} />
+              <Summary label="Quality" value={`${result.statistics?.data_quality?.data_quality_score}/100`} small={result.statistics?.data_quality?.grade} />
             </div>
-          </Card>
+            {result.processing_time_seconds !== undefined && (
+              <div className="perf-badge">
+                <span>⚡ Processed in {result.processing_time_seconds}s</span>
+                {result.chart_sampling_applied && <span className="perf-sampling">Sampling applied for charts (large dataset)</span>}
+                <span className="perf-count">{chartCounts.total} charts ready • lazy-loaded</span>
+              </div>
+            )}
 
-          <Card title="Advanced Numeric Statistics">
-            <pre>
-              {JSON.stringify(result.statistics?.numeric_summary || {}, null, 2)}
-            </pre>
-          </Card>
+            <Card title="Dataset Intelligence">
+              <InsightList items={result.statistics?.dataset_intelligence || []} />
+            </Card>
+            <Card title="Domain Insights">
+              <InsightList items={result.domain_insights || []} />
+            </Card>
 
-          <Card title="Categorical Statistics">
-            <pre>
-              {JSON.stringify(
-                result.statistics?.categorical_summary || {},
-                null,
-                2
+            <Card title="Dynamic Charts">
+              <div className="chart-tabs">
+                {[
+                  ["overview", `Overview (${Math.min(chartCounts.total, 6)})`],
+                  ["distributions", `Distributions (${chartCounts.bar + chartCounts.dist})`],
+                  ["trends", `Trends (${chartCounts.trends})`],
+                  ["correlation", "Correlation"],
+                ].map(([key, label]) => (
+                  <button key={key} className={`chart-tab-btn ${chartTab === key ? "active" : ""}`} onClick={() => setChartTab(key)}>{label}</button>
+                ))}
+              </div>
+              <div className="chart-grid">
+                {chartTab === "overview" && (
+                  <>
+                    {result.charts?.top_n_charts?.slice(0, 1).map((chart, i) => <BarBlock key={`top-${i}`} chart={chart} label="Top-N" />)}
+                    {result.charts?.bar_charts?.slice(0, 1).map((chart, i) => <BarBlock key={`bar-${i}`} chart={chart} label="Bar" />)}
+                    {result.charts?.line_charts?.slice(0, 1).map((chart, i) => <LineBlock key={`line-${i}`} chart={chart} />)}
+                    {result.charts?.pie_charts?.slice(0, 1).map((chart, i) => <PieBlock key={`pie-${i}`} chart={chart} />)}
+                    {result.charts?.histograms?.slice(0, 1).map((chart, i) => <HistBlock key={`hist-${i}`} chart={chart} />)}
+                    {result.charts?.scatter_plots?.slice(0, 1).map((chart, i) => <ScatterBlock key={`scatter-${i}`} chart={chart} />)}
+                  </>
+                )}
+                {chartTab === "distributions" && (
+                  <>
+                    {result.charts?.top_n_charts?.map((chart, i) => <BarBlock key={`top-${i}`} chart={chart} label="Top-N" />)}
+                    {result.charts?.bar_charts?.map((chart, i) => <BarBlock key={`bar-${i}`} chart={chart} label="Bar" />)}
+                    {result.charts?.pie_charts?.map((chart, i) => <PieBlock key={`pie-${i}`} chart={chart} />)}
+                    {result.charts?.histograms?.map((chart, i) => <HistBlock key={`hist-${i}`} chart={chart} />)}
+                  </>
+                )}
+                {chartTab === "trends" && (
+                  <>
+                    {result.charts?.line_charts?.map((chart, i) => <LineBlock key={`line-${i}`} chart={chart} />)}
+                    {result.charts?.area_charts?.map((chart, i) => <AreaBlock key={`area-${i}`} chart={chart} />)}
+                    {result.charts?.scatter_plots?.map((chart, i) => <ScatterBlock key={`scatter-${i}`} chart={chart} />)}
+                  </>
+                )}
+                {chartTab === "correlation" && <Heatmap result={result} />}
+              </div>
+              {chartTab !== "correlation" && result.charts?.correlation_heatmap && (
+                <p className="chart-hint">Correlation heatmap moved to <button className="link-btn" onClick={() => setChartTab("correlation")}>Correlation tab</button> for faster rendering.</p>
               )}
-            </pre>
-          </Card>
+            </Card>
 
-          <Card title="Detected Schema">
-            <pre>{JSON.stringify(result.schema || {}, null, 2)}</pre>
-          </Card>
-        </>
-      )}
-    </section>
-  );
+            <Card title="Advanced Numeric Statistics">
+              <pre>{JSON.stringify(result.statistics?.numeric_summary || {}, null, 2)}</pre>
+            </Card>
+            <Card title="Categorical Statistics">
+              <pre>{JSON.stringify(result.statistics?.categorical_summary || {}, null, 2)}</pre>
+            </Card>
+            <Card title="Detected Schema">
+              <pre>{JSON.stringify(result.schema || {}, null, 2)}</pre>
+            </Card>
+          </>
+        )}
+      </section>
+    );
+  };
 
   const MLStudio = () => (
     <section>
@@ -1343,110 +1351,72 @@ function App() {
     );
   }
 
-  function BarBlock({ chart, label = "Bar" }) {
+  const BarBlock = memo(function BarBlock({ chart, label = "Bar" }) {
+    const data = useMemo(() => chart.data, [chart.data]);
     return (
       <div className="chart-card">
         <div className="chart-head">
           <h4>{chart.title}</h4>
           <span>{label}</span>
         </div>
-
         <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={chart.data}>
+          <BarChart data={data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-            <XAxis
-              dataKey={chart.x_axis}
-              tick={{ fontSize: 11, fill: "#a3a3a3" }}
-            />
+            <XAxis dataKey={chart.x_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} interval={0} angle={data.length > 6 ? -20 : 0} dy={data.length > 6 ? 10 : 0} height={data.length > 6 ? 60 : 30} />
             <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
             <Tooltip {...tooltipProps} />
-            <Bar dataKey={chart.y_axis} radius={[8, 8, 0, 0]} fill="#e5e5e5" />
+            <Bar dataKey={chart.y_axis} radius={[8, 8, 0, 0]} fill="#e5e5e5" isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>
     );
-  }
+  });
 
-  function LineBlock({ chart }) {
+  const LineBlock = memo(function LineBlock({ chart }) {
     return (
       <div className="chart-card">
         <div className="chart-head">
           <h4>{chart.title}</h4>
           <span>Line</span>
         </div>
-
         <ResponsiveContainer width="100%" height={280}>
           <LineChart data={chart.data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-            <XAxis
-              dataKey={chart.x_axis}
-              tick={{ fontSize: 11, fill: "#a3a3a3" }}
-            />
+            <XAxis dataKey={chart.x_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} />
             <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
             <Tooltip {...tooltipProps} />
-            <Line
-              type="monotone"
-              dataKey={chart.y_axis}
-              stroke="#737373"
-              strokeWidth={3}
-              dot
-            />
+            <Line type="monotone" dataKey={chart.y_axis} stroke="#737373" strokeWidth={3} dot={false} isAnimationActive={false} />
           </LineChart>
         </ResponsiveContainer>
       </div>
     );
-  }
+  });
 
-  function AreaBlock({ chart }) {
+  const AreaBlock = memo(function AreaBlock({ chart }) {
     return (
       <div className="chart-card">
-        <div className="chart-head">
-          <h4>{chart.title}</h4>
-          <span>Area</span>
-        </div>
-
+        <div className="chart-head"><h4>{chart.title}</h4><span>Area</span></div>
         <ResponsiveContainer width="100%" height={280}>
           <AreaChart data={chart.data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-            <XAxis
-              dataKey={chart.x_axis}
-              tick={{ fontSize: 11, fill: "#a3a3a3" }}
-            />
+            <XAxis dataKey={chart.x_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} />
             <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
             <Tooltip {...tooltipProps} />
-            <Area
-              type="monotone"
-              dataKey={chart.y_axis}
-              stroke="#e5e5e5"
-              fill="#e5e5e5"
-              fillOpacity={0.25}
-            />
+            <Area type="monotone" dataKey={chart.y_axis} stroke="#e5e5e5" fill="#e5e5e5" fillOpacity={0.25} isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
     );
-  }
+  });
 
-  function PieBlock({ chart }) {
+  const PieBlock = memo(function PieBlock({ chart }) {
     return (
       <div className="chart-card">
-        <div className="chart-head">
-          <h4>{chart.title}</h4>
-          <span>Pie</span>
-        </div>
-
+        <div className="chart-head"><h4>{chart.title}</h4><span>Pie</span></div>
         <ResponsiveContainer width="100%" height={300}>
           <PieChart>
-            <Pie
-              data={chart.data}
-              dataKey={chart.value_key}
-              nameKey={chart.name_key}
-              outerRadius={100}
-              label
-            >
-              {chart.data.map((_, index) => (
-                <Cell key={index} fill={pieColors[index % pieColors.length]} />
-              ))}
+            <Pie data={chart.data} dataKey={chart.value_key} nameKey={chart.name_key} outerRadius={100} label isAnimationActive={false}>
+              {chart.data.map((_, index) => (<Cell key={index} fill={pieColors[index % pieColors.length]} />))}
             </Pie>
             <Tooltip {...tooltipProps} />
             <Legend />
@@ -1454,97 +1424,58 @@ function App() {
         </ResponsiveContainer>
       </div>
     );
-  }
+  });
 
-  function HistBlock({ chart }) {
+  const HistBlock = memo(function HistBlock({ chart }) {
     return (
       <div className="chart-card">
-        <div className="chart-head">
-          <h4>{chart.title}</h4>
-          <span>Histogram</span>
-        </div>
-
+        <div className="chart-head"><h4>{chart.title}</h4><span>Histogram</span></div>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={chart.data}>
             <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-            <XAxis
-              dataKey="range"
-              tick={{ fontSize: 10, fill: "#a3a3a3" }}
-            />
+            <XAxis dataKey="range" tick={{ fontSize: 10, fill: "#a3a3a3" }} interval={0} angle={-15} dy={8} height={50} />
             <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
             <Tooltip {...tooltipProps} />
-            <Bar dataKey="count" radius={[8, 8, 0, 0]} fill="#a3a3a3" />
+            <Bar dataKey="count" radius={[8, 8, 0, 0]} fill="#a3a3a3" isAnimationActive={false} />
           </BarChart>
         </ResponsiveContainer>
       </div>
     );
-  }
+  });
 
-  function ScatterBlock({ chart }) {
+  const ScatterBlock = memo(function ScatterBlock({ chart }) {
     return (
       <div className="chart-card">
-        <div className="chart-head">
-          <h4>{chart.title}</h4>
-          <span>Scatter</span>
-        </div>
-
+        <div className="chart-head"><h4>{chart.title}</h4><span>Scatter</span></div>
         <ResponsiveContainer width="100%" height={280}>
           <ScatterChart>
             <CartesianGrid stroke="#262626" />
-            <XAxis
-              type="number"
-              dataKey={chart.x_axis}
-              name={chart.x_axis}
-              tick={{ fontSize: 11, fill: "#a3a3a3" }}
-            />
-            <YAxis
-              type="number"
-              dataKey={chart.y_axis}
-              name={chart.y_axis}
-              tick={{ fontSize: 11, fill: "#a3a3a3" }}
-            />
+            <XAxis type="number" dataKey={chart.x_axis} name={chart.x_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} />
+            <YAxis type="number" dataKey={chart.y_axis} name={chart.y_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} />
             <Tooltip {...tooltipProps} cursor={{ stroke: "rgba(255, 255, 255, 0.25)", strokeDasharray: "3 3" }} />
-            <Scatter data={chart.data} fill="#22c55e" />
+            <Scatter data={chart.data} fill="#22c55e" isAnimationActive={false} />
           </ScatterChart>
         </ResponsiveContainer>
       </div>
     );
-  }
+  });
 
-  function Heatmap({ result }) {
+  const Heatmap = memo(function Heatmap({ result }) {
     const heatmap = result?.charts?.correlation_heatmap;
-
-    if (!heatmap?.data?.length) return null;
-
+    if (!heatmap?.data?.length) return <div className="empty-small">Not enough numeric columns for correlation.</div>;
     return (
       <div className="chart-card full">
-        <div className="chart-head">
-          <h4>{heatmap.title}</h4>
-          <span>Correlation</span>
-        </div>
-
+        <div className="chart-head"><h4>{heatmap.title}</h4><span>Correlation • capped to 8 columns for speed</span></div>
         <div className="heatmap-grid">
           {heatmap.data.map((cell, index) => {
             const intensity = Math.min(Math.abs(cell.value), 1);
-
-            const background =
-              cell.value >= 0
-                ? `rgba(255, 255, 255, ${0.12 + intensity * 0.55})`
-                : `rgba(224, 122, 45, ${0.12 + intensity * 0.55})`;
-
-            return (
-              <div className="heatmap-cell" style={{ background }} key={index}>
-                <span>
-                  {cell.y} × {cell.x}
-                </span>
-                <strong>{cell.value}</strong>
-              </div>
-            );
+            const background = cell.value >= 0 ? `rgba(255, 255, 255, ${0.12 + intensity * 0.55})` : `rgba(224, 122, 45, ${0.12 + intensity * 0.55})`;
+            return (<div className="heatmap-cell" style={{ background }} key={index}><span>{cell.y} × {cell.x}</span><strong>{cell.value}</strong></div>);
           })}
         </div>
       </div>
     );
-  }
+  });
 
   return (
     <div className="shell">
