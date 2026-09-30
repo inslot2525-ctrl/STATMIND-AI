@@ -3,6 +3,7 @@ import json
 import joblib
 from datetime import datetime
 from database import SessionLocal, ModelRegistry, init_db
+from services.storage import MODEL_DIR, resolve_in
 
 init_db()
 
@@ -22,13 +23,14 @@ def register_model(model_id, metadata=None):
     Register a model in the registry.
     If metadata not provided, attempts to load from model file.
     """
-    from database import SessionLocal
     # Load model to get metadata if not provided
     if metadata is None:
-        model_dir = os.path.join(os.path.dirname(__file__), "..", "models")
-        model_path = os.path.join(model_dir, model_id)
+        # Unpickling runs code: only load server-written .pkl files inside MODEL_DIR
+        if not model_id.endswith(".pkl"):
+            raise ValueError("Invalid model_id.")
+        model_path = resolve_in(MODEL_DIR, model_id)
         if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Model file not found: {model_path}")
+            raise FileNotFoundError(f"Model file not found: {model_id}")
         try:
             artifact = joblib.load(model_path)
             metadata = artifact.get("metadata", {})

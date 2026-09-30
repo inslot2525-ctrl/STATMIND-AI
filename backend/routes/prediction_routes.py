@@ -1,47 +1,23 @@
 import os
-import shutil
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import FileResponse
 
 from services.ml_engine import predict_with_saved_model
-from services.dataset_registry import get_dataset
+from services.storage import PREDICTION_DIR, resolve_in, save_upload
 
 router = APIRouter()
 
-UPLOAD_DIR = "uploads"
-PREDICTION_DIR = "predictions"
-
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(PREDICTION_DIR, exist_ok=True)
-
 
 @router.post("/predict-test-data")
-async def predict_test_data(
+def predict_test_data(
     model_id: str = Form(...),
     file: UploadFile = File(...),
     dataset_id: str = Form(None),  # Optional dataset_id for tracking
 ):
     try:
-        filename = file.filename
+        _, test_file_path = save_upload(file)
 
-        if not filename:
-            raise ValueError("No test file uploaded.")
-
-        if not (
-            filename.endswith(".csv")
-            or filename.endswith(".xlsx")
-            or filename.endswith(".xls")
-        ):
-            raise ValueError("Only CSV and Excel files are supported.")
-
-        test_file_path = os.path.join(UPLOAD_DIR, f"test_{filename}")
-
-        with open(test_file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        # Note: For predictions, we don't strictly need dataset_id since we're using a test file
-        # But we could log it for audit purposes if needed
         result = predict_with_saved_model(
             model_id=model_id,
             test_file_path=test_file_path,
@@ -57,21 +33,17 @@ async def predict_test_data(
 
 
 @router.get("/download-predictions/{filename}")
-async def download_predictions(filename: str):
+def download_predictions(filename: str):
     try:
-        file_path = os.path.join(PREDICTION_DIR, filename)
+        file_path = resolve_in(PREDICTION_DIR, filename)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid file name.")
 
-        if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail="Prediction file not found.")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Prediction file not found.")
 
-        return FileResponse(
-            path=file_path,
-            filename=filename,
-            media_type="text/csv",
-        )
-
-    except HTTPException:
-        raise
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type="text/csv",
+    )

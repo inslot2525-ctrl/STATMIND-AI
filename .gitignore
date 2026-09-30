@@ -19,10 +19,21 @@ dist/
 # Logs
 *.log
 
-# App runtime artifacts
-backend/saved_models/
+# App runtime data (lives in STATMIND_DATA_DIR; never commit user data or model binaries)
+backend/uploads/
+backend/models/
 backend/predictions/
-backend/uploads/test_*
+backend/reports/
+backend/saved_models/
+backend/dataset_registry.json
+backend/experiment_tracking.json
+backend/model_registry.json
+*.pkl
+
+# Test / tooling caches
+.pytest_cache/
+.coverage
+htmlcov/
 
 # OS
 .DS_Store

@@ -8,13 +8,9 @@ from typing import Any, Dict
 from services.ai_analyst import answer_data_scientist_question
 from services.leakage_detector import detect_leakage_from_file
 from services.report_generator import generate_intelligence_report
+from services.storage import REPORT_DIR, UPLOAD_DIR, resolve_in
 
 router = APIRouter()
-
-UPLOAD_DIR = "uploads"
-REPORT_DIR = "reports"
-
-os.makedirs(REPORT_DIR, exist_ok=True)
 
 
 class AnalystChatRequest(BaseModel):
@@ -44,7 +40,7 @@ async def chat_analyst(request: AnalystChatRequest):
 
 
 @router.post("/detect-leakage")
-async def detect_leakage(payload: Dict[str, Any]):
+def detect_leakage(payload: Dict[str, Any]):
     try:
         filename = payload.get("filename")
         target_column = payload.get("target_column")
@@ -55,7 +51,7 @@ async def detect_leakage(payload: Dict[str, Any]):
         if not target_column:
             raise ValueError("target_column is required.")
 
-        file_path = os.path.join(UPLOAD_DIR, filename)
+        file_path = resolve_in(UPLOAD_DIR, filename)
 
         if not os.path.exists(file_path):
             raise ValueError("Uploaded dataset file not found. Run analysis first.")
@@ -75,7 +71,7 @@ async def detect_leakage(payload: Dict[str, Any]):
 
 
 @router.post("/generate-report")
-async def generate_report(request: ReportRequest):
+def generate_report(request: ReportRequest):
     try:
         result = generate_intelligence_report(request.context)
 
@@ -86,21 +82,17 @@ async def generate_report(request: ReportRequest):
 
 
 @router.get("/download-report/{filename}")
-async def download_report(filename: str):
+def download_report(filename: str):
     try:
-        file_path = os.path.join(REPORT_DIR, filename)
+        file_path = resolve_in(REPORT_DIR, filename)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid file name.")
 
-        if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail="Report file not found.")
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Report file not found.")
 
-        return FileResponse(
-            path=file_path,
-            filename=filename,
-            media_type="text/html",
-        )
-
-    except HTTPException:
-        raise
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return FileResponse(
+        path=file_path,
+        filename=filename,
+        media_type="text/html",
+    )

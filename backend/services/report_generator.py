@@ -3,9 +3,7 @@ import uuid
 import html
 from datetime import datetime
 
-REPORT_DIR = "reports"
-
-os.makedirs(REPORT_DIR, exist_ok=True)
+from services.storage import REPORT_DIR
 
 
 def _safe(value):

@@ -1,38 +1,38 @@
-import os
 from fastapi import APIRouter, Form, HTTPException
 
 from services.ml_engine import train_model_from_file, compare_models_from_file
 from services.dataset_registry import get_dataset
+from services.storage import UPLOAD_DIR, resolve_in
 
 router = APIRouter()
 
-UPLOAD_DIR = "uploads"
+
+def _resolve_dataset_path(dataset_id: str | None, filename: str | None) -> str:
+    """Find the dataset file from a dataset_id, or from a stored upload name (legacy)."""
+    if dataset_id:
+        dataset_info = get_dataset(dataset_id)
+        if not dataset_info:
+            raise ValueError(f"Dataset {dataset_id} not found")
+        return dataset_info["file_path"]
+
+    if filename:
+        return resolve_in(UPLOAD_DIR, filename)
+
+    raise ValueError("Either filename or dataset_id must be provided")
 
 
+# Training endpoints are plain `def` so FastAPI runs them in a worker thread
+# instead of blocking the event loop while scikit-learn fits.
 @router.post("/train-model")
-async def train_model(
-    filename: str = Form(None),  # Make filename optional
-    dataset_id: str = Form(None),  # NEW: dataset_id parameter
+def train_model(
+    filename: str = Form(None),
+    dataset_id: str = Form(None),
     target_column: str = Form(...),
     algorithm: str = Form(...),
     test_size: float = Form(0.2),
 ):
     try:
-        # Determine which file to use
-        if dataset_id:
-            # Look up dataset by ID
-            dataset_info = get_dataset(dataset_id)
-            if not dataset_info:
-                raise HTTPException(status_code=400, detail=f"Dataset {dataset_id} not found")
-            file_path = dataset_info["file_path"]
-            # Use original filename for display/logging
-            filename_for_display = dataset_info["original_filename"]
-        elif filename:
-            # Fallback to original behavior (backward compatibility)
-            file_path = os.path.join(UPLOAD_DIR, filename)
-            filename_for_display = filename
-        else:
-            raise ValueError("Either filename or dataset_id must be provided")
+        file_path = _resolve_dataset_path(dataset_id, filename)
 
         result = train_model_from_file(
             file_path=file_path,
@@ -52,25 +52,14 @@ async def train_model(
 
 
 @router.post("/compare-models")
-async def compare_models(
-    filename: str = Form(None),  # Make filename optional
-    dataset_id: str = Form(None),  # NEW: dataset_id parameter
+def compare_models(
+    filename: str = Form(None),
+    dataset_id: str = Form(None),
     target_column: str = Form(...),
     test_size: float = Form(0.2),
 ):
     try:
-        # Determine which file to use
-        if dataset_id:
-            # Look up dataset by ID
-            dataset_info = get_dataset(dataset_id)
-            if not dataset_info:
-                raise HTTPException(status_code=400, detail=f"Dataset {dataset_id} not found")
-            file_path = dataset_info["file_path"]
-        elif filename:
-            # Fallback to original behavior (backward compatibility)
-            file_path = os.path.join(UPLOAD_DIR, filename)
-        else:
-            raise ValueError("Either filename or dataset_id must be provided")
+        file_path = _resolve_dataset_path(dataset_id, filename)
 
         result = compare_models_from_file(
             file_path=file_path,

@@ -7,7 +7,9 @@ import numpy as np
 from services.file_reader import read_uploaded_file
 from services.experiment_tracker import log_experiment
 from services.model_registry import register_model
+from services.storage import MODEL_DIR, PREDICTION_DIR, resolve_in, safe_component
 
+from sklearn.base import clone
 from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -37,12 +39,6 @@ from sklearn.metrics import (
     mean_squared_error,
     r2_score,
 )
-
-MODEL_DIR = "models"
-PREDICTION_DIR = "predictions"
-
-os.makedirs(MODEL_DIR, exist_ok=True)
-os.makedirs(PREDICTION_DIR, exist_ok=True)
 
 
 def detect_task_type(y: pd.Series) -> str:
@@ -107,7 +103,7 @@ def get_available_models(task_type: str) -> dict:
             ),
             "decision_tree": DecisionTreeClassifier(random_state=42),
             "knn": KNeighborsClassifier(n_neighbors=5),
-            "svm": SVC(kernel="rbf", probability=True),
+            "svm": SVC(kernel="rbf"),
         }
 
     if task_type == "regression":
@@ -437,8 +433,10 @@ def extract_feature_importance(pipeline):
 
 
 def save_trained_model(pipeline, metadata):
-    model_id = f"{metadata['algorithm']}_{metadata['target_column']}_{uuid.uuid4().hex[:8]}.pkl"
-    safe_model_id = model_id.replace(" ", "_").replace("/", "_").replace("\\", "_")
+    safe_model_id = (
+        f"{safe_component(metadata['algorithm'])}_{safe_component(metadata['target_column'])}"
+        f"_{uuid.uuid4().hex[:8]}.pkl"
+    )
 
     model_path = os.path.join(MODEL_DIR, safe_model_id)
 
@@ -631,7 +629,8 @@ def compare_models_from_file(
         try:
             pipeline = Pipeline(
                 steps=[
-                    ("preprocessor", data["preprocessor"]),
+                    # Fresh copy per model so candidates never share fitted state
+                    ("preprocessor", clone(data["preprocessor"])),
                     ("model", model),
                 ]
             )
@@ -703,16 +702,29 @@ def compare_models_from_file(
     }
 
 
-def predict_with_saved_model(model_id: str, test_file_path: str) -> dict:
-    model_path = os.path.join(MODEL_DIR, model_id)
+def load_model_artifact(model_id: str) -> dict:
+    """
+    Load a saved model by ID.
+
+    Models are pickles, and unpickling runs code, so only server-written files
+    inside MODEL_DIR with a .pkl name may ever be loaded.
+    """
+    if not model_id or not model_id.endswith(".pkl"):
+        raise ValueError("Invalid model_id.")
+
+    model_path = resolve_in(MODEL_DIR, model_id)
 
     if not os.path.exists(model_path):
         raise ValueError("Saved model not found. Train a model first.")
 
+    return joblib.load(model_path)
+
+
+def predict_with_saved_model(model_id: str, test_file_path: str) -> dict:
+    artifact = load_model_artifact(model_id)
+
     if not os.path.exists(test_file_path):
         raise ValueError("Test file not found.")
-
-    artifact = joblib.load(model_path)
 
     pipeline = artifact["pipeline"]
     metadata = artifact["metadata"]

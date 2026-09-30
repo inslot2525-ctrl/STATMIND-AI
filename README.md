@@ -155,10 +155,10 @@ statmind-ai/
 │   │   ├── leakage_detector.py     # Data leakage analysis
 │   │   ├── ai_analyst.py           # Chatbot / Q&A engine
 │   │   ├── report_generator.py     # HTML report builder
-│   │   └── file_reader.py          # CSV / Excel reader
-│   ├── uploads/              # Uploaded datasets
-│   ├── saved_models/         # Persisted trained models (.pkl)
-│   └── predictions/          # Generated prediction CSVs
+│   │   ├── file_reader.py          # CSV / Excel reader
+│   │   └── storage.py              # Safe paths, content-addressed uploads
+│   └── (runtime data)        # uploads/, models/, predictions/, reports/, statmind.db
+│                             #   -> stored in STATMIND_DATA_DIR, never committed
 │
 └── frontend/                 # React + Vite frontend
     └── src/
@@ -214,6 +214,24 @@ npm run dev
 ```
 
 Frontend runs at → `http://localhost:5173`
+
+### 4. Run the tests
+
+```bash
+pip install -r backend/requirements-dev.txt
+pytest            # from the repo root; uses a throwaway data dir, never your real DB
+```
+
+### Configuration
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `STATMIND_DATA_DIR` | `backend/` (Docker: `/data`) | Where the DB, uploads, models, predictions and reports are stored. Mount a persistent volume here in production. |
+| `DATABASE_URL` | SQLite in `STATMIND_DATA_DIR` | SQLAlchemy URL, e.g. a Postgres database. |
+| `MAX_UPLOAD_MB` | `50` | Maximum upload size. |
+| `ALLOWED_ORIGINS` | localhost dev ports | Comma-separated CORS origins. |
+| `ALLOWED_ORIGIN_REGEX` | `https://.*\.vercel\.app` | CORS origin regex; narrow it to your own Vercel project. |
+| `LOG_LEVEL` | `INFO` | Backend log level. |
 
 ---
 

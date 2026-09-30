@@ -13,19 +13,23 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: "pip"
-      - run: pip install -r backend/requirements.txt
-      - run: python -c "from database import init_db; init_db(); print('DB ok')"
-        working-directory: backend
-      - run: python -c "import main; print('FastAPI import ok')"
-        working-directory: backend
-      - name: Run benchmark tests
-        run: pytest ../tests -v -s
-        working-directory: backend
-      - run: curl -s http://localhost:8000/api/health || echo "health check skipped in CI (no server)"
+          cache-dependency-path: backend/requirements*.txt
+      - run: pip install -r backend/requirements-dev.txt
+      - name: Run tests (API, security, benchmarks)
+        run: pytest -v
       - name: Build backend image
         run: docker build -t statmind-backend ./backend
+      - name: Smoke-test the container
+        run: |
+          docker run -d --name api -p 8000:8000 statmind-backend
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/api/health; then exit 0; fi
+            sleep 1
+          done
+          docker logs api
+          exit 1
 
   frontend:
     runs-on: ubuntu-latest

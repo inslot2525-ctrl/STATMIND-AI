@@ -1,61 +1,74 @@
 import os
-import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 from fastapi.testclient import TestClient
 from main import app
 
 client = TestClient(app)
 
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+
+
 def test_health():
     r = client.get("/api/health")
     assert r.status_code == 200
     data = r.json()
-    assert data["status"] in ("ok", "degraded")
-    assert "database" in data
-    print(f"\n[health] {data}")
+    assert data["status"] == "ok"
+    assert data["database"] == "ok"
+
 
 def test_analyze_and_train_flow():
-    """Full flow: upload iris.csv → analyze → train → check experiment logged."""
-    iris = os.path.join(os.path.dirname(__file__), "data", "iris.csv")
-    with open(iris, "rb") as f:
+    """Full flow: upload iris.csv -> analyze -> train -> experiment logged -> predict."""
+    with open(os.path.join(DATA_DIR, "iris.csv"), "rb") as f:
         r = client.post("/api/analyze", files={"file": ("iris.csv", f, "text/csv")}, data={"domain": "research"})
     assert r.status_code == 200, r.text
-    dataset_id = r.json().get("dataset_id")
-    assert dataset_id, "no dataset_id from /api/analyze"
-    print(f"\n[analyze] dataset_id={dataset_id}")
+    body = r.json()
+    dataset_id = body["dataset_id"]
+    assert body["original_filename"] == "iris.csv"
 
-    # Train using dataset_id (new SQLite path)
-    r2 = client.post("/api/train-model", data={"dataset_id": dataset_id, "target_column": "target", "algorithm": "random_forest", "test_size": "0.2"})
+    r2 = client.post(
+        "/api/train-model",
+        data={"dataset_id": dataset_id, "target_column": "target", "algorithm": "random_forest", "test_size": "0.2"},
+    )
     assert r2.status_code == 200, r2.text
-    j2 = r2.json()
-    assert "metrics" in j2
-    print(f"[train] metrics={j2['metrics']} model_id={j2.get('model_id')}")
+    trained = r2.json()
+    assert trained["metrics"]["accuracy"] > 0.85
 
-    # Verify experiment was logged
     r3 = client.get(f"/api/experiments/?dataset_id={dataset_id}")
     assert r3.status_code == 200
-    data = r3.json()
-    # Normalize: API may return list, dict, or {"experiments": [...]}
-    if isinstance(data, dict) and "experiments" in data:
-        exps = data["experiments"]
-    elif isinstance(data, dict):
-        # dict of id->exp
-        exps = list(data.values())
-    else:
-        exps = data  # list
-    # Handle nested list case
-    if exps and isinstance(exps[0], list):
-        exps = exps[0]
-    assert len(exps) >= 1
-    first = exps[0]
-    # first may be dict with metrics as JSON string or dict
-    metrics = first.get("metrics") if isinstance(first, dict) else first
-    print(f"[experiments] count={len(exps)} latest_metrics={metrics}")
+    experiments = r3.json()["experiments"]
+    assert any(e["model_id"] == trained["model_id"] for e in experiments)
+
+    with open(os.path.join(DATA_DIR, "iris.csv"), "rb") as f:
+        r4 = client.post(
+            "/api/predict-test-data",
+            data={"model_id": trained["model_id"]},
+            files={"file": ("iris.csv", f, "text/csv")},
+        )
+    assert r4.status_code == 200, r4.text
+    prediction_file = r4.json()["prediction_filename"]
+
+    r5 = client.get(f"/api/download-predictions/{prediction_file}")
+    assert r5.status_code == 200
+
+
+def test_legacy_filename_flow():
+    """The frontend passes the stored `filename` from /api/analyze to later endpoints."""
+    with open(os.path.join(DATA_DIR, "iris.csv"), "rb") as f:
+        stored = client.post("/api/analyze", files={"file": ("iris.csv", f, "text/csv")}).json()["filename"]
+
+    r = client.post("/api/recommend-target", data={"filename": stored})
+    assert r.status_code == 200, r.text
+
+    r = client.post("/api/detect-leakage", json={"filename": stored, "target_column": "target"})
+    assert r.status_code == 200, r.text
+
+
+def test_unknown_dataset_id_is_client_error():
+    r = client.post("/api/train-model", data={"dataset_id": "does-not-exist", "target_column": "t", "algorithm": "ridge"})
+    assert r.status_code == 400
+
 
 def test_list_endpoints():
     for path in ["/api/datasets", "/api/models/", "/api/experiments/"]:
         r = client.get(path)
-        # Some may be /api/experiments vs /api/experiments/ — accept 200 or 307
-        assert r.status_code in (200, 307, 404), f"{path} failed {r.status_code}"
-        print(f"[{path}] {r.status_code}")
+        assert r.status_code == 200, f"{path} failed {r.status_code}"

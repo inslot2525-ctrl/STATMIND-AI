@@ -1,13 +1,18 @@
-.git
-.gitignore
-node_modules
-backend/__pycache__
-backend/*.pyc
-frontend/node_modules
-frontend/dist
-.dvc
-.dvcstore
-backend/statmind.db
-backend/statmind.db-journal
+# Build context is ./backend - paths are relative to it
+__pycache__/
+*.pyc
+.pytest_cache/
 *.log
-.DS_Store
+
+# Runtime data must never be baked into the image
+statmind.db
+statmind.db-journal
+uploads/
+models/
+predictions/
+reports/
+saved_models/
+dataset_registry.json
+experiment_tracking.json
+model_registry.json
+requirements-dev.txt

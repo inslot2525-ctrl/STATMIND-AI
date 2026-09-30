@@ -11,3 +11,9 @@ backend/statmind.db
 backend/statmind.db-journal
 *.log
 .DS_Store
+backend/uploads
+backend/models
+backend/predictions
+backend/reports
+backend/*.json
+tests

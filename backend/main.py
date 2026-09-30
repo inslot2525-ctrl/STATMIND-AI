@@ -1,5 +1,13 @@
+import logging
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 from routes.analysis_routes import router as analysis_router
 from routes.target_routes import router as target_router
@@ -12,8 +20,6 @@ app = FastAPI(
     description="Statistics, ML, AutoML, target recommendation, prediction, leakage detection, AI analyst, and report generation API.",
     version="1.0.0",
 )
-
-import os
 
 # Allow Vercel frontend + local dev. Set ALLOWED_ORIGINS env as comma-separated list to override.
 _allowed = os.getenv("ALLOWED_ORIGINS", "")
@@ -32,8 +38,10 @@ else:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
-    allow_origin_regex=r"https://.*\.vercel\.app",
-    allow_credentials=True,
+    # Narrow this to your project, e.g. r"https://statmind-.*\.vercel\.app"
+    allow_origin_regex=os.getenv("ALLOWED_ORIGIN_REGEX", r"https://.*\.vercel\.app"),
+    # The frontend sends no cookies; never combine credentials with a wildcard regex
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

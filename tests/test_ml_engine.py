@@ -1,9 +1,7 @@
 import os
-import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 import pytest
-from services.ml_engine import train_model_from_file
+from services.ml_engine import get_available_models, train_model_from_file
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
@@ -48,14 +46,32 @@ def test_diabetes_regression():
     print(f"\n[diabetes] metrics: {m}")
     assert r2 > 0.30, f"diabetes R2 too low: {r2}"
 
-def test_all_algorithms_smoke():
-    """Smoke test: all algorithms for classification should run without error on iris."""
-    from services.ml_engine import get_available_models
-    iris_path = os.path.join(DATA_DIR, "iris.csv")
-    for algo in get_available_models("classification"):
-        try:
-            r = train_model_from_file(iris_path, "target", algorithm=algo, test_size=0.2)
-            assert "model_id" in r
-            print(f"  {algo}: ok -> {r['metrics']}")
-        except Exception as e:
-            pytest.skip(f"{algo} skipped: {e}")
+@pytest.mark.parametrize("algo", list(get_available_models("classification")))
+def test_classification_algorithms_smoke(algo):
+    """Every classification algorithm must train on iris. A failure is a real failure, not a skip."""
+    r = train_model_from_file(os.path.join(DATA_DIR, "iris.csv"), "target", algorithm=algo, test_size=0.2)
+    assert r["model_id"].endswith(".pkl")
+    assert 0 <= r["metrics"]["accuracy"] <= 1
+
+
+@pytest.mark.parametrize("algo", list(get_available_models("regression")))
+def test_regression_algorithms_smoke(algo):
+    """Every regression algorithm must train on diabetes."""
+    r = train_model_from_file(os.path.join(DATA_DIR, "diabetes.csv"), "target", algorithm=algo, test_size=0.2)
+    assert r["model_id"].endswith(".pkl")
+    assert "r2_score" in r["metrics"]
+
+
+def test_model_id_is_filesystem_safe():
+    """A target column with path characters must not leak into the model file name."""
+    import pandas as pd
+    import tempfile
+
+    df = pd.read_csv(os.path.join(DATA_DIR, "iris.csv")).rename(columns={"target": "../evil name"})
+    with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, newline="") as tmp:
+        df.to_csv(tmp, index=False)
+    try:
+        r = train_model_from_file(tmp.name, "../evil name", algorithm="decision_tree")
+    finally:
+        os.remove(tmp.name)
+    assert "/" not in r["model_id"] and "\\" not in r["model_id"] and ".." not in r["model_id"]
