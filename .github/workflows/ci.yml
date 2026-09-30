@@ -2,13 +2,30 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
     branches: [main]
 
 jobs:
   backend:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        database: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: statmind
+          POSTGRES_PASSWORD: statmind
+          POSTGRES_DB: statmind_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U statmind"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: ${{ matrix.database == 'postgres' && 'postgresql+psycopg://statmind:statmind@localhost:5432/statmind_test' || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -17,19 +34,24 @@ jobs:
           cache: "pip"
           cache-dependency-path: backend/requirements*.txt
       - run: pip install -r backend/requirements-dev.txt
-      - name: Run tests (API, security, benchmarks)
+      - name: Run tests on ${{ matrix.database }} (API, auth, isolation, jobs, storage, security, benchmarks)
         run: pytest -v
       - name: Build backend image
+        if: matrix.database == 'sqlite'
         run: docker build -t statmind-backend ./backend
-      - name: Smoke-test the container
+      - name: Smoke-test the container (migrations, health, registration)
+        if: matrix.database == 'sqlite'
         run: |
           docker run -d --name api -p 8000:8000 statmind-backend
           for i in $(seq 1 30); do
-            if curl -fsS http://localhost:8000/api/health; then exit 0; fi
+            if curl -fsS http://localhost:8000/api/health; then break; fi
             sleep 1
           done
-          docker logs api
-          exit 1
+          curl -fsS -X POST http://localhost:8000/api/auth/register \
+            -H "Content-Type: application/json" \
+            -d '{"email":"ci@example.com","password":"ci-password-123"}' > /dev/null \
+            || { docker logs api; exit 1; }
+          echo "container OK"
 
   frontend:
     runs-on: ubuntu-latest

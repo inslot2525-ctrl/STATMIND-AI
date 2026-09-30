@@ -1,13 +1,28 @@
+import logging
 import os
+import tempfile
 import uuid
+from typing import Callable, Optional
+
 import joblib
 import pandas as pd
 import numpy as np
 
 from services.file_reader import read_uploaded_file
 from services.experiment_tracker import log_experiment
-from services.model_registry import register_model
-from services.storage import MODEL_DIR, PREDICTION_DIR, resolve_in, safe_component
+from services.model_registry import get_model_record, register_model
+from services.artifacts import create_artifact
+from services.storage import TMP_DIR, get_storage, make_key, safe_component
+
+logger = logging.getLogger(__name__)
+
+# progress(percent, message) - lets background jobs report where training is
+ProgressFn = Optional[Callable[[int, str], None]]
+
+
+def _report(progress: ProgressFn, percent: int, message: str):
+    if progress:
+        progress(percent, message)
 
 from sklearn.base import clone
 from sklearn.model_selection import train_test_split
@@ -438,16 +453,18 @@ def save_trained_model(pipeline, metadata):
         f"_{uuid.uuid4().hex[:8]}.pkl"
     )
 
-    model_path = os.path.join(MODEL_DIR, safe_model_id)
+    key = make_key("models", safe_model_id)
 
-    artifact = {
-        "pipeline": pipeline,
-        "metadata": metadata,
-    }
+    fd, tmp_path = tempfile.mkstemp(dir=TMP_DIR, suffix=".pkl")
+    os.close(fd)
+    try:
+        joblib.dump({"pipeline": pipeline, "metadata": metadata}, tmp_path)
+        get_storage().put_file(key, tmp_path, move=True)
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
-    joblib.dump(artifact, model_path)
-
-    return safe_model_id
+    return safe_model_id, key
 
 
 def train_model_from_file(
@@ -456,7 +473,14 @@ def train_model_from_file(
     algorithm: str,
     test_size: float = 0.2,
     dataset_id: str = None,
+    owner_id: str = None,
+    progress: ProgressFn = None,
 ) -> dict:
+    """
+    Train one model and register it. owner_id=None registers an unowned model
+    (used by offline benchmarks); API calls always pass the current user.
+    """
+    _report(progress, 5, "Loading and preparing data")
     data = prepare_ml_data(file_path, target_column, test_size)
 
     task_type = data["task_type"]
@@ -469,7 +493,10 @@ def train_model_from_file(
         ]
     )
 
+    _report(progress, 20, f"Training {algorithm}")
     pipeline.fit(data["X_train"], data["y_train"])
+
+    _report(progress, 75, "Evaluating on the test split")
     predictions = pipeline.predict(data["X_test"])
 
     metrics = evaluate_model(task_type, data["y_test"], predictions)
@@ -485,21 +512,21 @@ def train_model_from_file(
         "test_size": float(test_size),
     }
 
-    model_id = save_trained_model(pipeline, metadata)
+    _report(progress, 90, "Saving and registering the model")
+    model_id, model_key = save_trained_model(pipeline, metadata)
 
     # ── MLOps: register model and log experiment ──────────────────
-    try:
-        full_metadata = {**metadata, "model_id": model_id, "metrics": metrics}
-        if dataset_id:
-            full_metadata["dataset_id"] = dataset_id
-        register_model(model_id, full_metadata)
-    except Exception:
-        pass  # don't fail training if registry write fails
+    # Registration is required: models are only reachable through the registry.
+    full_metadata = {**metadata, "model_id": model_id, "metrics": metrics}
+    if dataset_id:
+        full_metadata["dataset_id"] = dataset_id
+    register_model(model_id, full_metadata, owner_id=owner_id, storage_key=model_key)
 
     experiment_id = None
-    if dataset_id:
+    if dataset_id and owner_id:
         try:
             experiment_id = log_experiment(
+                owner_id=owner_id,
                 dataset_id=dataset_id,
                 algorithm=algorithm,
                 hyperparameters={"test_size": float(test_size)},
@@ -507,11 +534,12 @@ def train_model_from_file(
                 model_id=model_id,
             )
         except Exception:
-            pass  # don't fail training if tracking write fails
+            logger.exception("Experiment logging failed for model %s", model_id)
     # ─────────────────────────────────────────────────────────────
 
     result = {
         "model_id": model_id,
+        "experiment_id": experiment_id,
         "task_type": task_type,
         "algorithm": algorithm,
         "target_column": target_column,
@@ -553,7 +581,9 @@ def compare_models_from_file(
     target_column: str,
     test_size: float = 0.2,
     dataset_id: str = None,
+    progress: ProgressFn = None,
 ) -> dict:
+    _report(progress, 5, "Loading and preparing data")
     data = prepare_ml_data(file_path, target_column, test_size)
 
     task_type = data["task_type"]
@@ -625,7 +655,8 @@ def compare_models_from_file(
 
     leaderboard = []
 
-    for algorithm, model in models.items():
+    for index, (algorithm, model) in enumerate(models.items()):
+        _report(progress, 10 + int(85 * index / len(models)), f"Training {algorithm}")
         try:
             pipeline = Pipeline(
                 steps=[
@@ -702,26 +733,23 @@ def compare_models_from_file(
     }
 
 
-def load_model_artifact(model_id: str) -> dict:
+def load_model_artifact(model_id: str, owner_id: str) -> dict:
     """
-    Load a saved model by ID.
+    Load a model the user owns.
 
-    Models are pickles, and unpickling runs code, so only server-written files
-    inside MODEL_DIR with a .pkl name may ever be loaded.
+    Models are pickles, and unpickling runs code, so a model is only loaded if
+    it is registered to this user; its storage key was written by the server.
     """
-    if not model_id or not model_id.endswith(".pkl"):
-        raise ValueError("Invalid model_id.")
+    record = get_model_record(model_id, owner_id) if model_id else None
 
-    model_path = resolve_in(MODEL_DIR, model_id)
-
-    if not os.path.exists(model_path):
+    if record is None or not record.storage_key:
         raise ValueError("Saved model not found. Train a model first.")
 
-    return joblib.load(model_path)
+    return joblib.load(get_storage().local_path(record.storage_key))
 
 
-def predict_with_saved_model(model_id: str, test_file_path: str) -> dict:
-    artifact = load_model_artifact(model_id)
+def predict_with_saved_model(model_id: str, test_file_path: str, owner_id: str) -> dict:
+    artifact = load_model_artifact(model_id, owner_id)
 
     if not os.path.exists(test_file_path):
         raise ValueError("Test file not found.")
@@ -770,10 +798,14 @@ def predict_with_saved_model(model_id: str, test_file_path: str) -> dict:
             label_mapping=label_mapping,
         )
 
-    prediction_filename = f"predictions_{uuid.uuid4().hex[:8]}.csv"
-    prediction_path = os.path.join(PREDICTION_DIR, prediction_filename)
-
-    output_df.to_csv(prediction_path, index=False)
+    prediction_filename = f"predictions_{safe_component(target_column)}_{uuid.uuid4().hex[:8]}.csv"
+    artifact_record = create_artifact(
+        owner_id=owner_id,
+        kind="prediction",
+        data=output_df.to_csv(index=False).encode("utf-8"),
+        extension=".csv",
+        download_name=prediction_filename,
+    )
 
     preview = (
         output_df.head(10)
@@ -788,6 +820,7 @@ def predict_with_saved_model(model_id: str, test_file_path: str) -> dict:
         "target_column": target_column,
         "prediction_column": prediction_column,
         "prediction_filename": prediction_filename,
+        "artifact_id": artifact_record["id"],
         "rows_predicted": int(len(output_df)),
         "preview": preview,
         "external_test_metrics": external_metrics,

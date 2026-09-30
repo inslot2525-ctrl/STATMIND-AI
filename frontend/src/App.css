@@ -1818,3 +1818,111 @@ pre {
 .progress-bar-fill { height:100%; width:30%; background:linear-gradient(90deg, #22c55e, #e5e5e5); border-radius:999px; }
 .progress-bar-fill.animate { animation: progressSlide 1.2s ease-in-out infinite; }
 @keyframes progressSlide { 0%{ transform:translateX(-100%);} 100%{ transform:translateX(400%);} }
+
+/* ACCOUNT + JOB PROGRESS */
+
+.auth-notice,
+.auth-error {
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.auth-notice {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  color: var(--soft);
+  margin-bottom: 16px;
+}
+
+.auth-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+
+.auth-hint {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: -6px;
+}
+
+.auth-switch {
+  margin-top: 18px;
+  width: 100%;
+  background: none;
+  border: 0;
+  color: var(--soft);
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.auth-switch:hover {
+  color: var(--text);
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.user-email {
+  color: var(--muted);
+  font-size: 13px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-menu button {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.user-menu button:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.job-progress {
+  margin-top: 18px;
+}
+
+.job-progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--soft);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.job-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.job-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #a3a3a3, #ffffff);
+  transition: width 0.4s ease;
+}
+
+@media (max-width: 900px) {
+  .user-email {
+    display: none;
+  }
+}

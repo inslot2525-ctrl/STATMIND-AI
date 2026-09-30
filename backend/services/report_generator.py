@@ -1,9 +1,8 @@
-import os
 import uuid
 import html
 from datetime import datetime
 
-from services.storage import REPORT_DIR
+from services.artifacts import create_artifact
 
 
 def _safe(value):
@@ -76,7 +75,7 @@ def _render_table(rows, columns=None, max_rows=12):
     """
 
 
-def generate_intelligence_report(context: dict):
+def generate_intelligence_report(context: dict, owner_id: str):
     """
     Generates an HTML report from frontend context.
 
@@ -103,7 +102,6 @@ def generate_intelligence_report(context: dict):
     leakage_result = context.get("leakageResult") or context.get("leakage_result") or {}
 
     filename = f"statmind_report_{uuid.uuid4().hex[:8]}.html"
-    file_path = os.path.join(REPORT_DIR, filename)
 
     best_target = target_advice.get("best_target")
     data_quality = statistics.get("data_quality") or {}
@@ -407,11 +405,16 @@ def generate_intelligence_report(context: dict):
 </html>
     """
 
-    with open(file_path, "w", encoding="utf-8") as file:
-        file.write(html_content)
+    artifact = create_artifact(
+        owner_id=owner_id,
+        kind="report",
+        data=html_content.encode("utf-8"),
+        extension=".html",
+        download_name=filename,
+    )
 
     return {
         "report_filename": filename,
-        "report_path": file_path,
+        "artifact_id": artifact["id"],
         "message": "Intelligence report generated successfully.",
     }

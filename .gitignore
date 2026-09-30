@@ -24,6 +24,8 @@ backend/uploads/
 backend/models/
 backend/predictions/
 backend/reports/
+backend/cache/
+backend/tmp/
 backend/saved_models/
 backend/dataset_registry.json
 backend/experiment_tracking.json

@@ -1,10 +1,9 @@
-import os
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
 
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from fastapi.responses import FileResponse
-
+from database import User
+from services.auth import get_current_user
 from services.ml_engine import predict_with_saved_model
-from services.storage import PREDICTION_DIR, resolve_in, save_upload
+from services.storage import save_upload
 
 router = APIRouter()
 
@@ -14,36 +13,21 @@ def predict_test_data(
     model_id: str = Form(...),
     file: UploadFile = File(...),
     dataset_id: str = Form(None),  # Optional dataset_id for tracking
+    user: User = Depends(get_current_user),
 ):
     try:
-        _, test_file_path = save_upload(file)
+        _, _, test_file_path = save_upload(file)
 
-        result = predict_with_saved_model(
+        # The prediction CSV is stored as an artifact; download it via
+        # GET /api/artifacts/{artifact_id}/download-url
+        return predict_with_saved_model(
             model_id=model_id,
             test_file_path=test_file_path,
+            owner_id=user.id,
         )
-
-        return result
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/download-predictions/{filename}")
-def download_predictions(filename: str):
-    try:
-        file_path = resolve_in(PREDICTION_DIR, filename)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid file name.")
-
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Prediction file not found.")
-
-    return FileResponse(
-        path=file_path,
-        filename=filename,
-        media_type="text/csv",
-    )

@@ -1,14 +1,10 @@
-import os
 import json
+import uuid
 from datetime import datetime
+
+from database import SessionLocal, Experiment
 from services.dataset_registry import get_dataset
-from database import SessionLocal, Experiment, init_db
 
-init_db()
-
-def _next_id(db):
-    ids = [int(r.id) for r in db.query(Experiment.id).all() if r.id.isdigit()]
-    return str(max(ids) + 1) if ids else "1"
 
 def _to_dict(obj):
     if not obj:
@@ -26,72 +22,74 @@ def _to_dict(obj):
         "notes": obj.notes or "",
     }
 
+
 def log_experiment(
+    owner_id,
     dataset_id,
     algorithm,
     hyperparameters=None,
     metrics=None,
     model_id=None,
     tags=None,
-    notes=None
+    notes=None,
 ):
-    """
-    Log an ML experiment.
-    Returns experiment_id.
-    """
-    dataset_info = get_dataset(dataset_id)
+    """Log an ML experiment for a user. Returns experiment_id."""
+    dataset_info = get_dataset(dataset_id, owner_id)
     if not dataset_info:
         raise ValueError(f"Dataset {dataset_id} not found in registry")
 
     db = SessionLocal()
     try:
-        experiment_id = _next_id(db)
         exp = Experiment(
-            id=experiment_id,
+            id=uuid.uuid4().hex,
+            owner_id=owner_id,
             timestamp=datetime.now().isoformat(),
             dataset_id=str(dataset_id),
             dataset_info=json.dumps({
                 "filename": dataset_info["original_filename"],
                 "rows": dataset_info.get("rows"),
-                "columns": dataset_info.get("columns")
+                "columns": dataset_info.get("columns"),
             }),
             algorithm=algorithm,
             hyperparameters=json.dumps(hyperparameters or {}),
             metrics=json.dumps(metrics or {}),
             model_id=model_id,
             tags=json.dumps(tags or []),
-            notes=notes or ""
+            notes=notes or "",
         )
         db.add(exp)
         db.commit()
-        return experiment_id
+        return exp.id
     finally:
         db.close()
 
-def get_experiment(experiment_id):
+
+def get_experiment(experiment_id, owner_id):
     db = SessionLocal()
     try:
-        obj = db.query(Experiment).filter_by(id=str(experiment_id)).first()
+        obj = db.query(Experiment).filter_by(id=str(experiment_id), owner_id=owner_id).first()
         return _to_dict(obj)
     finally:
         db.close()
 
-def list_experiments(dataset_id=None, limit=50):
+
+def list_experiments(owner_id, dataset_id=None, limit=50):
     db = SessionLocal()
     try:
-        q = db.query(Experiment)
+        q = db.query(Experiment).filter_by(owner_id=owner_id)
         if dataset_id:
             q = q.filter_by(dataset_id=str(dataset_id))
-        # SQLite string timestamp ISO sorts lexicographically same as chronological
+        # ISO timestamps sort lexicographically in chronological order
         objs = q.order_by(Experiment.timestamp.desc()).limit(limit).all()
         return [_to_dict(o) for o in objs]
     finally:
         db.close()
 
-def get_experiments_for_model(model_id):
+
+def get_experiments_for_model(model_id, owner_id):
     db = SessionLocal()
     try:
-        objs = db.query(Experiment).filter_by(model_id=model_id).all()
+        objs = db.query(Experiment).filter_by(model_id=model_id, owner_id=owner_id).all()
         return [_to_dict(o) for o in objs]
     finally:
         db.close()

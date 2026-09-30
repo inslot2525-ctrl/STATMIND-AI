@@ -1,24 +1,22 @@
-import os
 import hashlib
-import json
+import uuid
 from datetime import datetime
-from services.file_reader import read_uploaded_file
-from database import SessionLocal, Dataset, init_db
 
-# Ensure DB and tables exist
-init_db()
+from sqlalchemy.exc import IntegrityError
+
+from database import SessionLocal, Dataset
+from services.file_reader import read_uploaded_file
+from services.storage import get_storage
+
 
 def _calculate_file_hash(filepath):
     """Calculate SHA256 hash of file content"""
     sha256_hash = hashlib.sha256()
     with open(filepath, "rb") as f:
-        for byte_block in iter(lambda: f.read(4096), b""):
+        for byte_block in iter(lambda: f.read(1024 * 1024), b""):
             sha256_hash.update(byte_block)
     return sha256_hash.hexdigest()
 
-def _next_id(db):
-    ids = [int(r.id) for r in db.query(Dataset.id).all() if r.id.isdigit()]
-    return str(max(ids) + 1) if ids else "1"
 
 def _to_dict(obj):
     if not obj:
@@ -28,33 +26,30 @@ def _to_dict(obj):
         "content_hash": obj.content_hash,
         "original_filename": obj.original_filename,
         "stored_filename": obj.stored_filename,
+        "storage_key": obj.storage_key,
         "upload_time": obj.upload_time,
         "rows": obj.rows,
         "columns": obj.columns,
         "missing_cells": obj.missing_cells,
         "duplicate_rows": obj.duplicate_rows,
-        "file_path": obj.file_path,
         "error": obj.error,
     }
 
-def register_dataset(file_path, original_filename):
+
+def register_dataset(owner_id, stored_name, storage_key, local_path, original_filename):
     """
-    Register a dataset in the registry, returning dataset_id.
-    If identical content exists, returns existing ID.
+    Register an uploaded dataset for a user and return its dataset_id.
+    Uploading identical content again returns the user's existing dataset_id.
     """
-    file_hash = _calculate_file_hash(file_path)
+    file_hash = _calculate_file_hash(local_path)
     db = SessionLocal()
     try:
-        # Check dedup
-        existing = db.query(Dataset).filter_by(content_hash=file_hash).first()
+        existing = db.query(Dataset).filter_by(owner_id=owner_id, content_hash=file_hash).first()
         if existing:
             return existing.id
 
-        dataset_id = _next_id(db)
-
-        # Read dataset to get metadata
         try:
-            df = read_uploaded_file(file_path)
+            df = read_uploaded_file(local_path)
             rows, cols = df.shape
             missing_count = int(df.isna().sum().sum())
             duplicate_rows = int(df.duplicated().sum())
@@ -64,46 +59,69 @@ def register_dataset(file_path, original_filename):
             error = str(e)
 
         ds = Dataset(
-            id=dataset_id,
+            id=uuid.uuid4().hex,
+            owner_id=owner_id,
             content_hash=file_hash,
             original_filename=original_filename,
-            stored_filename=os.path.basename(file_path),
+            stored_filename=stored_name,
+            storage_key=storage_key,
             upload_time=datetime.now().isoformat(),
             rows=rows,
             columns=cols,
             missing_cells=missing_count,
             duplicate_rows=duplicate_rows,
-            file_path=file_path,
-            error=error
+            file_path=storage_key,
+            error=error,
         )
         db.add(ds)
-        db.commit()
-        return dataset_id
+        try:
+            db.commit()
+        except IntegrityError:
+            # The same user uploaded the same file concurrently; use the winner's row
+            db.rollback()
+            return db.query(Dataset).filter_by(owner_id=owner_id, content_hash=file_hash).one().id
+        return ds.id
     finally:
         db.close()
 
-def get_dataset(dataset_id):
-    """Get dataset metadata by ID"""
+
+def get_dataset(dataset_id, owner_id):
+    """Get metadata for a dataset the user owns, or None."""
     db = SessionLocal()
     try:
-        obj = db.query(Dataset).filter_by(id=str(dataset_id)).first()
+        obj = db.query(Dataset).filter_by(id=str(dataset_id), owner_id=owner_id).first()
         return _to_dict(obj)
     finally:
         db.close()
 
-def list_datasets():
-    """List all registered datasets"""
-    db = SessionLocal()
-    try:
-        return [_to_dict(o) for o in db.query(Dataset).all()]
-    finally:
-        db.close()
 
-def get_dataset_by_hash(file_hash):
-    """Find dataset by content hash"""
+def get_dataset_by_stored_name(stored_name, owner_id):
+    """Look up a user's dataset by the `filename` returned from /api/analyze."""
     db = SessionLocal()
     try:
-        obj = db.query(Dataset).filter_by(content_hash=file_hash).first()
+        obj = (
+            db.query(Dataset)
+            .filter_by(stored_filename=stored_name, owner_id=owner_id)
+            .order_by(Dataset.upload_time.desc())
+            .first()
+        )
         return _to_dict(obj)
     finally:
         db.close()
+
+
+def list_datasets(owner_id):
+    """List the user's registered datasets, newest first."""
+    db = SessionLocal()
+    try:
+        objs = db.query(Dataset).filter_by(owner_id=owner_id).order_by(Dataset.upload_time.desc()).all()
+        return [_to_dict(o) for o in objs]
+    finally:
+        db.close()
+
+
+def dataset_local_path(dataset: dict) -> str:
+    """A readable local file for a dataset (downloads from object storage if needed)."""
+    if not dataset.get("storage_key"):
+        raise ValueError("Dataset file is missing. Please upload it again.")
+    return get_storage().local_path(dataset["storage_key"])

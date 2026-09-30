@@ -137,32 +137,35 @@ Download it. Send it. Look extremely smart in meetings.
 ```
 statmind-ai/
 ├── backend/                  # FastAPI Python backend
-│   ├── main.py               # App entry point, CORS, router registration
+│   ├── main.py               # App entry point, CORS, auth-protected routers, startup
+│   ├── config.py             # All settings, from environment variables
+│   ├── database.py           # SQLAlchemy models (users, datasets, jobs, ...)
+│   ├── migrations/           # Alembic schema migrations (run automatically)
+│   ├── worker.py             # Standalone background job worker
+│   ├── manage.py             # Admin CLI: create-user, claim-legacy-data
 │   ├── routes/
-│   │   ├── analysis_routes.py      # /api/analyze
+│   │   ├── auth_routes.py          # /api/auth/register, /login, /me
+│   │   ├── analysis_routes.py      # /api/analyze, /api/datasets
 │   │   ├── target_routes.py        # /api/recommend-target
-│   │   ├── ml_routes.py            # /api/train-model, /api/compare-models
+│   │   ├── ml_routes.py            # /api/train-model, /api/compare-models (jobs), registries
+│   │   ├── job_routes.py           # /api/jobs
 │   │   ├── prediction_routes.py    # /api/predict-test-data
+│   │   ├── artifact_routes.py      # /api/artifacts (signed download links)
 │   │   └── intelligence_routes.py  # /api/chat-analyst, /api/detect-leakage, /api/generate-report
-│   ├── services/
-│   │   ├── analysis_engine.py      # Dataset profiling orchestrator
-│   │   ├── stats_engine.py         # Statistics, quality scoring
-│   │   ├── schema_detector.py      # Column type detection
-│   │   ├── chart_recommender.py    # Dynamic chart generation
-│   │   ├── domain_analyzer.py      # Domain-specific insights
-│   │   ├── target_advisor.py       # AI target variable recommendation
-│   │   ├── ml_engine.py            # Model training, AutoML, predictions
-│   │   ├── leakage_detector.py     # Data leakage analysis
-│   │   ├── ai_analyst.py           # Chatbot / Q&A engine
-│   │   ├── report_generator.py     # HTML report builder
-│   │   ├── file_reader.py          # CSV / Excel reader
-│   │   └── storage.py              # Safe paths, content-addressed uploads
-│   └── (runtime data)        # uploads/, models/, predictions/, reports/, statmind.db
-│                             #   -> stored in STATMIND_DATA_DIR, never committed
+│   └── services/
+│       ├── auth.py                 # Password hashing, JWT, current-user dependency
+│       ├── jobs.py, job_tasks.py   # Database-backed job queue and its tasks
+│       ├── storage.py              # Local / S3 storage, content-addressed uploads
+│       ├── artifacts.py            # Owned downloadable files
+│       ├── ml_engine.py            # Model training, AutoML, predictions
+│       ├── dataset_registry.py, experiment_tracker.py, model_registry.py
+│       └── ...                     # Statistics, charts, leakage, target advisor, reports
 │
 └── frontend/                 # React + Vite frontend
     └── src/
-        ├── App.jsx           # Entire UI — all studios live here
+        ├── App.jsx           # All studios
+        ├── AuthScreen.jsx    # Login / registration
+        ├── api.js            # API client: tokens, job polling, downloads
         └── App.css           # Dark glassmorphism design system
 ```
 
@@ -205,6 +208,18 @@ uvicorn main:app --reload --port 8000
 Backend runs at → `http://localhost:8000`  
 API docs → `http://localhost:8000/docs`
 
+Locally this needs no extra services: SQLite, files on disk, and background jobs
+run in a worker thread inside the API. Open the app and create an account; every
+dataset, model and experiment is private to its owner.
+
+Upgrading from a version without accounts? Your old datasets and models are kept
+but have no owner yet. Create your account, then give them to it:
+
+```bash
+cd backend
+python manage.py claim-legacy-data you@example.com
+```
+
 ### 3. Frontend setup
 
 ```bash
@@ -222,12 +237,28 @@ pip install -r backend/requirements-dev.txt
 pytest            # from the repo root; uses a throwaway data dir, never your real DB
 ```
 
+### Or: the full stack with Docker
+
+```bash
+docker compose up --build
+```
+
+Runs Postgres, the API, a separate job worker and the frontend, the same shape as production.
+
 ### Configuration
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `STATMIND_DATA_DIR` | `backend/` (Docker: `/data`) | Where the DB, uploads, models, predictions and reports are stored. Mount a persistent volume here in production. |
-| `DATABASE_URL` | SQLite in `STATMIND_DATA_DIR` | SQLAlchemy URL, e.g. a Postgres database. |
+| `STATMIND_ENV` | `development` | Set to `production` to refuse to start without `JWT_SECRET`. |
+| `JWT_SECRET` | random per start | Signs login tokens and download links. **Required in production** (32+ random characters). |
+| `ACCESS_TOKEN_MINUTES` | `720` | How long a login lasts. |
+| `ALLOW_REGISTRATION` | `true` | Set `false` to allow only accounts created with `manage.py create-user`. |
+| `DATABASE_URL` | SQLite in `STATMIND_DATA_DIR` | Any SQLAlchemy URL. `postgres://...` URLs (Railway, Heroku) are accepted as-is. Schema migrations run automatically on startup. |
+| `STORAGE_BACKEND` | `local` | `local` (files under `STATMIND_DATA_DIR`) or `s3` (AWS S3, Cloudflare R2, MinIO). |
+| `S3_BUCKET` / `S3_ENDPOINT_URL` / `S3_REGION` / `S3_PREFIX` | — | Bucket settings for `STORAGE_BACKEND=s3`. Leave the endpoint empty for AWS; set it for R2/MinIO. Credentials come from `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. |
+| `JOB_BACKEND` | `thread` | `thread`: the API also runs jobs. `worker`: the API only queues them; run `python worker.py` separately. |
+| `JOB_STALE_SECONDS` / `JOB_MAX_ATTEMPTS` | `120` / `3` | A job whose worker stops responding is retried, then failed. |
+| `STATMIND_DATA_DIR` | `backend/` (Docker: `/data`) | Local files: SQLite DB, uploads, models, predictions, reports, S3 cache. |
 | `MAX_UPLOAD_MB` | `50` | Maximum upload size. |
 | `ALLOWED_ORIGINS` | localhost dev ports | Comma-separated CORS origins. |
 | `ALLOWED_ORIGIN_REGEX` | `https://.*\.vercel\.app` | CORS origin regex; narrow it to your own Vercel project. |
@@ -237,20 +268,34 @@ pytest            # from the repo root; uses a throwaway data dir, never your re
 
 ## 🔌 API Reference
 
+All endpoints except registration, login and health need an `Authorization: Bearer <token>` header.
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| `POST` | `/api/auth/register` | Create an account (JSON `email`, `password`) → token |
+| `POST` | `/api/auth/login` | Log in (form `username`, `password`) → token |
+| `GET`  | `/api/auth/me` | The current user |
 | `POST` | `/api/analyze` | Upload & profile a dataset |
 | `POST` | `/api/recommend-target` | AI target variable suggestion |
-| `POST` | `/api/train-model` | Train an ML model |
-| `POST` | `/api/compare-models` | AutoML leaderboard |
+| `POST` | `/api/train-model` | Start a training job → `202` + job |
+| `POST` | `/api/compare-models` | Start an AutoML leaderboard job → `202` + job |
+| `GET`  | `/api/jobs/{id}` | Job status, progress, and result when finished |
 | `POST` | `/api/predict-test-data` | Run predictions with a saved model |
-| `GET`  | `/api/download-predictions/{file}` | Download prediction CSV |
+| `GET`  | `/api/artifacts/{id}/download-url` | Short-lived link to download a prediction CSV or report |
 | `POST` | `/api/chat-analyst` | Ask the AI data scientist |
 | `POST` | `/api/detect-leakage` | Data leakage detection |
 | `POST` | `/api/generate-report` | Generate HTML intelligence report |
-| `GET`  | `/api/download-report/{file}` | Download the report |
+| `GET`  | `/api/datasets`, `/api/models/`, `/api/experiments/` | Your registries |
 
-Full interactive docs at `/docs` (FastAPI Swagger UI).
+Full interactive docs at `/docs` (FastAPI Swagger UI; use **Authorize** to log in).
+
+### Deploying (e.g. Railway)
+
+1. Add a **Postgres** database; set `DATABASE_URL` on the API.
+2. Create a bucket on **Cloudflare R2** (or S3); set `STORAGE_BACKEND=s3` and the `S3_*` / `AWS_*` variables.
+   Without a bucket, attach a persistent volume at `/data` instead.
+3. Set `STATMIND_ENV=production`, a long random `JWT_SECRET`, and `ALLOWED_ORIGIN_REGEX` for your Vercel URL.
+4. For heavy training, set `JOB_BACKEND=worker` and add a second service from the same image with start command `python worker.py` and the same variables.
 
 ---
 
@@ -268,6 +313,9 @@ Full interactive docs at `/docs` (FastAPI Swagger UI).
 
 **Backend**
 - [FastAPI](https://fastapi.tiangolo.com/) — async Python API framework
+- [SQLAlchemy](https://www.sqlalchemy.org/) + [Alembic](https://alembic.sqlalchemy.org/) — SQLite / PostgreSQL with migrations
+- [PyJWT](https://pyjwt.readthedocs.io/) + argon2 ([pwdlib](https://frankie567.github.io/pwdlib/)) — accounts and tokens
+- [boto3](https://boto3.amazonaws.com/) — S3 / R2 / MinIO storage
 - [scikit-learn](https://scikit-learn.org/) — ML algorithms
 - [pandas](https://pandas.pydata.org/) — data manipulation
 - [numpy](https://numpy.org/) — numerical computing
@@ -278,14 +326,14 @@ Full interactive docs at `/docs` (FastAPI Swagger UI).
 - [React 19](https://react.dev/) — UI framework
 - [Vite 8](https://vitejs.dev/) — blazing fast build tool
 - [Recharts](https://recharts.org/) — chart library
-- [Axios](https://axios-http.com/) — HTTP client
 
 ---
 
 ## 🗺️ Roadmap
 
-- [ ] Real authentication (JWT / OAuth)
-- [ ] Database persistence for sessions and models
+- [x] User accounts (JWT) with per-user data isolation
+- [x] PostgreSQL + migrations, S3/R2 storage, background jobs
+- [ ] OAuth login (Google / GitHub) and password reset
 - [ ] Time series forecasting module
 - [ ] NLP / text column analysis
 - [ ] Model explainability (SHAP values)

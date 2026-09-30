@@ -1,4 +1,4 @@
-import { useState, useMemo, memo, lazy, Suspense } from "react";
+import { useState, useEffect, useMemo, memo, lazy, Suspense } from "react";
 import {
   BarChart,
   Bar,
@@ -19,10 +19,29 @@ import {
   Legend,
 } from "recharts";
 import "./App.css";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000";
+import AuthScreen from "./AuthScreen";
+import {
+  apiFetch,
+  clearSession,
+  downloadArtifact,
+  getStoredUser,
+  getToken,
+  onUnauthorized,
+  postForm,
+  runJob,
+} from "./api";
 
 function App() {
+  const [user, setUser] = useState(() => (getToken() ? getStoredUser() : null));
+  const [authNotice, setAuthNotice] = useState("");
+
+  useEffect(() => {
+    onUnauthorized(() => {
+      setUser(null);
+      setAuthNotice("Your session has expired. Please log in again.");
+    });
+  }, []);
+
   const [currentPage, setCurrentPage] = useState("dashboard");
 
   const [file, setFile] = useState(null);
@@ -37,6 +56,7 @@ function App() {
   const [compareResult, setCompareResult] = useState(null);
   const [mlLoading, setMlLoading] = useState(false);
   const [compareLoading, setCompareLoading] = useState(false);
+  const [jobProgress, setJobProgress] = useState(null);
   const [mlError, setMlError] = useState("");
   const [modelId, setModelId] = useState("");
   const [predictionFile, setPredictionFile] = useState(null);
@@ -99,33 +119,7 @@ function App() {
     formData.append("domain", domain);
 
     try {
-      console.log("Sending analysis request...");
-      console.log("File:", file.name);
-      console.log("Domain:", domain);
-
-      const response = await fetch(`${API_BASE_URL}/api/analyze`, {
-        method: "POST",
-        body: formData,
-      });
-
-      console.log("Response status:", response.status);
-
-      const text = await response.text();
-      console.log("Raw backend response:", text);
-
-      let data;
-
-      try {
-        data = JSON.parse(text);
-      } catch {
-        throw new Error("Backend did not return valid JSON.");
-      }
-
-      if (!response.ok) {
-        throw new Error(data.detail || "Backend returned an error.");
-      }
-
-      console.log("Parsed analysis result:", data);
+      const data = await postForm("/api/analyze", formData);
 
       setResult(data);
       const columns = Object.keys(data.schema?.dtypes || {});
@@ -156,27 +150,7 @@ function App() {
     ["lasso", "Lasso Regression"],
   ];
 
-  const callFormEndpoint = async (endpoint, formData) => {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: "POST",
-      body: formData,
-    });
-
-    const text = await response.text();
-    let data;
-
-    try {
-      data = JSON.parse(text);
-    } catch {
-      throw new Error("Backend did not return valid JSON.");
-    }
-
-    if (!response.ok) {
-      throw new Error(data.detail || "Backend returned an error.");
-    }
-
-    return data;
-  };
+  const callFormEndpoint = postForm;
 
   const buildTrainingForm = () => {
     if (!datasetFilename) {
@@ -202,15 +176,18 @@ function App() {
     return formData;
   };
 
+  // Training and AutoML run as background jobs on the server; runJob polls
+  // until they finish and reports progress along the way.
   const trainModel = async () => {
     setMlLoading(true);
     setMlError("");
+    setJobProgress(null);
 
     try {
       const formData = buildTrainingForm();
       formData.append("algorithm", algorithm);
 
-      const data = await callFormEndpoint("/api/train-model", formData);
+      const data = await runJob("/api/train-model", formData, setJobProgress);
 
       setMlResult(data);
       setModelId(data.model_id || "");
@@ -219,22 +196,25 @@ function App() {
       setMlError(error.message || "Model training failed.");
     } finally {
       setMlLoading(false);
+      setJobProgress(null);
     }
   };
 
   const compareModels = async () => {
     setCompareLoading(true);
     setMlError("");
+    setJobProgress(null);
 
     try {
       const formData = buildTrainingForm();
-      const data = await callFormEndpoint("/api/compare-models", formData);
+      const data = await runJob("/api/compare-models", formData, setJobProgress);
 
       setCompareResult(data);
     } catch (error) {
       setMlError(error.message || "Model comparison failed.");
     } finally {
       setCompareLoading(false);
+      setJobProgress(null);
     }
   };
 
@@ -244,8 +224,7 @@ function App() {
     setMlopsLoading(true);
     setMlopsError("");
     try {
-      const res = await fetch(`${API_BASE_URL}/api/experiments/`);
-      const data = await res.json();
+      const data = await apiFetch("/api/experiments/");
       setExperiments(data.experiments || []);
     } catch {
       setMlopsError("Failed to load experiments.");
@@ -258,8 +237,7 @@ function App() {
     setMlopsLoading(true);
     setMlopsError("");
     try {
-      const res = await fetch(`${API_BASE_URL}/api/models/`);
-      const data = await res.json();
+      const data = await apiFetch("/api/models/");
       setModels(data.models || []);
     } catch {
       setMlopsError("Failed to load models.");
@@ -272,11 +250,8 @@ function App() {
     setMlopsLoading(true);
     setMlopsError("");
     try {
-      const res = await fetch(`${API_BASE_URL}/api/datasets/`);
-      if (res.ok) {
-        const data = await res.json();
-        setDatasets(data.datasets || []);
-      }
+      const data = await apiFetch("/api/datasets");
+      setDatasets(data.datasets || []);
     } catch {
       setMlopsError("Failed to load datasets.");
     } finally {
@@ -287,15 +262,13 @@ function App() {
   const transitionModelStage = async (modelId, stage) => {
     setStageLoading((prev) => ({ ...prev, [modelId]: true }));
     try {
-      const res = await fetch(
-        `${API_BASE_URL}/api/models/${modelId}/transition?stage=${stage}`,
+      await apiFetch(
+        `/api/models/${encodeURIComponent(modelId)}/transition?stage=${encodeURIComponent(stage)}`,
         { method: "POST" }
       );
-      if (res.ok) {
-        await fetchModels();
-      }
-    } catch {
-      // ignore
+      await fetchModels();
+    } catch (error) {
+      setMlopsError(error.message || "Could not change the model stage.");
     } finally {
       setStageLoading((prev) => ({ ...prev, [modelId]: false }));
     }
@@ -980,18 +953,30 @@ function App() {
             </div>
 
             <div className="action-row">
-              <button className="primary" onClick={trainModel} disabled={mlLoading}>
+              <button className="primary" onClick={trainModel} disabled={mlLoading || compareLoading}>
                 {mlLoading ? "Training..." : "Train Model"}
               </button>
 
               <button
                 className="primary green"
                 onClick={compareModels}
-                disabled={compareLoading}
+                disabled={mlLoading || compareLoading}
               >
                 {compareLoading ? "Comparing..." : "Compare Models"}
               </button>
             </div>
+
+            {jobProgress && (
+              <div className="job-progress" role="status" aria-live="polite">
+                <div className="job-progress-label">
+                  <span>{jobProgress.status === "queued" ? "Queued" : jobProgress.message || "Working"}</span>
+                  <span>{jobProgress.progress ?? 0}%</span>
+                </div>
+                <div className="job-progress-track">
+                  <div className="job-progress-fill" style={{ width: `${jobProgress.progress ?? 0}%` }} />
+                </div>
+              </div>
+            )}
           </Card>
 
           {mlError && (
@@ -1164,12 +1149,17 @@ function App() {
               <strong>{predictionResult.prediction_filename}</strong>
             </div>
 
-            <a
+            <button
+              type="button"
               className="download-btn"
-              href={`${API_BASE_URL}/api/download-predictions/${predictionResult.prediction_filename}`}
+              onClick={() =>
+                downloadArtifact(predictionResult.artifact_id).catch((error) =>
+                  setPredictionError(error.message || "Download failed.")
+                )
+              }
             >
               Download Predictions CSV
-            </a>
+            </button>
           </Card>
 
           {predictionResult.external_test_metrics && (
@@ -1477,6 +1467,31 @@ function App() {
     );
   });
 
+  const logout = () => {
+    clearSession();
+    setUser(null);
+    setAuthNotice("");
+    setResult(null);
+    setMlResult(null);
+    setCompareResult(null);
+    setPredictionResult(null);
+    setDatasetId("");
+    setModelId("");
+    setCurrentPage("dashboard");
+  };
+
+  if (!user) {
+    return (
+      <AuthScreen
+        notice={authNotice}
+        onAuthenticated={(loggedIn) => {
+          setUser(loggedIn);
+          setAuthNotice("");
+        }}
+      />
+    );
+  }
+
   return (
     <div className="shell">
       <header className="topbar">
@@ -1512,6 +1527,11 @@ function App() {
             </button>
           ))}
         </nav>
+
+        <div className="user-menu">
+          <span className="user-email" title={user.email}>{user.email}</span>
+          <button type="button" onClick={logout}>Log out</button>
+        </div>
       </header>
 
       <main className="main">

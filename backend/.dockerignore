@@ -11,6 +11,8 @@ uploads/
 models/
 predictions/
 reports/
+cache/
+tmp/
 saved_models/
 dataset_registry.json
 experiment_tracking.json

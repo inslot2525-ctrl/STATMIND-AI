@@ -1,11 +1,10 @@
-import os
 import json
-import joblib
 from datetime import datetime
-from database import SessionLocal, ModelRegistry, init_db
-from services.storage import MODEL_DIR, resolve_in
 
-init_db()
+from database import SessionLocal, ModelRegistry
+
+VALID_STAGES = ["development", "staging", "production", "archived"]
+
 
 def _to_dict(obj):
     if not obj:
@@ -18,113 +17,97 @@ def _to_dict(obj):
         "versions": json.loads(obj.versions_json) if obj.versions_json else [],
     }
 
-def register_model(model_id, metadata=None):
-    """
-    Register a model in the registry.
-    If metadata not provided, attempts to load from model file.
-    """
-    # Load model to get metadata if not provided
-    if metadata is None:
-        # Unpickling runs code: only load server-written .pkl files inside MODEL_DIR
-        if not model_id.endswith(".pkl"):
-            raise ValueError("Invalid model_id.")
-        model_path = resolve_in(MODEL_DIR, model_id)
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Model file not found: {model_id}")
-        try:
-            artifact = joblib.load(model_path)
-            metadata = artifact.get("metadata", {})
-        except Exception as e:
-            metadata = {
-                "model_id": model_id,
-                "error": f"Failed to load model: {str(e)}"
-            }
 
-    if "model_id" not in metadata:
-        metadata["model_id"] = model_id
+def register_model(model_id, metadata, owner_id, storage_key):
+    """Register a newly trained model, or merge metadata into an existing entry."""
+    metadata = {**metadata, "model_id": model_id}
 
     db = SessionLocal()
     try:
-        existing = db.query(ModelRegistry).filter_by(model_id=model_id).first()
+        existing = db.query(ModelRegistry).filter_by(model_id=model_id, owner_id=owner_id).first()
         if existing:
             existing.updated_at = datetime.now().isoformat()
-            # Merge metadata
             existing_meta = json.loads(existing.metadata_json) if existing.metadata_json else {}
-            merged = {**existing_meta, **metadata}
-            existing.metadata_json = json.dumps(merged, default=str)
+            existing.metadata_json = json.dumps({**existing_meta, **metadata}, default=str)
             db.commit()
             return _to_dict(existing)
-        else:
-            entry = ModelRegistry(
-                model_id=model_id,
-                registered_at=datetime.now().isoformat(),
-                updated_at=datetime.now().isoformat(),
-                metadata_json=json.dumps(metadata, default=str),
-                versions_json=json.dumps([{
-                    "version": "1.0.0",
-                    "stage": "development",
-                    "registered_at": datetime.now().isoformat()
-                }])
-            )
-            db.add(entry)
-            db.commit()
-            return _to_dict(entry)
+
+        entry = ModelRegistry(
+            model_id=model_id,
+            owner_id=owner_id,
+            storage_key=storage_key,
+            registered_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat(),
+            metadata_json=json.dumps(metadata, default=str),
+            versions_json=json.dumps([{
+                "version": "1.0.0",
+                "stage": "development",
+                "registered_at": datetime.now().isoformat(),
+            }]),
+        )
+        db.add(entry)
+        db.commit()
+        return _to_dict(entry)
     finally:
         db.close()
 
-def get_model(model_id):
-    """Get model metadata by ID"""
+
+def get_model_record(model_id, owner_id):
+    """Return the ORM row for a model the user owns, or None."""
     db = SessionLocal()
     try:
-        obj = db.query(ModelRegistry).filter_by(model_id=model_id).first()
-        return _to_dict(obj)
+        return db.query(ModelRegistry).filter_by(model_id=model_id, owner_id=owner_id).first()
     finally:
         db.close()
 
-def list_models(filter_criteria=None):
-    """
-    List models with optional filtering.
-    filter_criteria: dict of metadata fields to match
-    """
+
+def get_model(model_id, owner_id):
+    return _to_dict(get_model_record(model_id, owner_id))
+
+
+def list_models(owner_id, filter_criteria=None):
+    """List the user's models, optionally filtered by metadata fields."""
     db = SessionLocal()
     try:
-        objs = db.query(ModelRegistry).order_by(ModelRegistry.registered_at.desc()).all()
+        objs = (
+            db.query(ModelRegistry)
+            .filter_by(owner_id=owner_id)
+            .order_by(ModelRegistry.registered_at.desc())
+            .all()
+        )
         models = [_to_dict(o) for o in objs]
         if filter_criteria:
-            filtered = []
-            for m in models:
-                meta = m.get("metadata", {})
-                if all(meta.get(k) == v for k, v in filter_criteria.items()):
-                    filtered.append(m)
-            models = filtered
+            models = [
+                m for m in models
+                if all(m["metadata"].get(k) == v for k, v in filter_criteria.items())
+            ]
         return models
     finally:
         db.close()
 
-def transition_model_stage(model_id, stage, version=None):
+
+def transition_model_stage(model_id, stage, owner_id, version=None):
     """
     Transition a model version to a stage (development, staging, production, archived).
     If version not specified, affects the latest version.
     """
-    valid_stages = ["development", "staging", "production", "archived"]
-    if stage not in valid_stages:
-        raise ValueError(f"Invalid stage. Must be one of: {valid_stages}")
+    if stage not in VALID_STAGES:
+        raise ValueError(f"Invalid stage. Must be one of: {VALID_STAGES}")
 
     db = SessionLocal()
     try:
-        obj = db.query(ModelRegistry).filter_by(model_id=model_id).first()
+        obj = db.query(ModelRegistry).filter_by(model_id=model_id, owner_id=owner_id).first()
         if not obj:
-            raise ValueError(f"Model {model_id} not found in registry")
+            raise LookupError(f"Model {model_id} not found")
 
         versions = json.loads(obj.versions_json) if obj.versions_json else []
 
-        # Determine target version
         if version is None:
             if versions:
                 def version_key(v):
                     try:
                         return [int(x) for x in v["version"].split(".")]
-                    except:
+                    except (ValueError, KeyError, AttributeError):
                         return [0, 0, 0]
                 versions.sort(key=version_key, reverse=True)
                 target_version = versions[0]["version"]
@@ -133,23 +116,19 @@ def transition_model_stage(model_id, stage, version=None):
         else:
             target_version = version
 
-        version_found = False
         for v in versions:
             if v["version"] == target_version:
                 v["stage"] = stage
                 v["transitioned_at"] = datetime.now().isoformat()
-                version_found = True
                 break
-
-        if not version_found:
+        else:
             versions.append({
                 "version": target_version,
                 "stage": stage,
-                "transitioned_at": datetime.now().isoformat()
+                "transitioned_at": datetime.now().isoformat(),
             })
 
         obj.versions_json = json.dumps(versions)
-        # Also update metadata stage
         meta = json.loads(obj.metadata_json) if obj.metadata_json else {}
         meta["stage"] = stage
         obj.metadata_json = json.dumps(meta, default=str)
@@ -159,36 +138,13 @@ def transition_model_stage(model_id, stage, version=None):
     finally:
         db.close()
 
-def get_production_models():
-    """Get all models currently in production stage"""
-    db = SessionLocal()
-    try:
-        models = [_to_dict(o) for o in db.query(ModelRegistry).all()]
-        prod = []
-        for m in models:
-            for v in m.get("versions", []):
-                if v.get("stage") == "production":
-                    prod.append({
-                        "model_id": m["model_id"],
-                        "version": v["version"],
-                        **m["metadata"]
-                    })
-                    break
-        return prod
-    finally:
-        db.close()
 
-def get_model_lineage(model_id):
-    """
-    Get the lineage of a model - what experiments/datasets led to it.
-    """
-    m = get_model(model_id)
-    if not m:
-        return None
-    meta = m.get("metadata", {})
-    return {
-        "model_id": model_id,
-        "dataset_id": meta.get("dataset_id"),
-        "experiment_ids": meta.get("experiment_ids", []),
-        "training_timestamp": meta.get("created_at"),
-    }
+def get_production_models(owner_id):
+    """Get the user's models currently in production stage"""
+    prod = []
+    for m in list_models(owner_id):
+        for v in m.get("versions", []):
+            if v.get("stage") == "production":
+                prod.append({"model_id": m["model_id"], "version": v["version"], **m["metadata"]})
+                break
+    return prod

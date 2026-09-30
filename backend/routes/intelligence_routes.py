@@ -1,14 +1,15 @@
-import os
-
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
-from pydantic import BaseModel
 from typing import Any, Dict
 
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+
+from database import User
+from routes.deps import resolve_user_dataset
 from services.ai_analyst import answer_data_scientist_question
+from services.auth import get_current_user
+from services.dataset_registry import dataset_local_path
 from services.leakage_detector import detect_leakage_from_file
 from services.report_generator import generate_intelligence_report
-from services.storage import REPORT_DIR, UPLOAD_DIR, resolve_in
 
 router = APIRouter()
 
@@ -22,15 +23,19 @@ class ReportRequest(BaseModel):
     context: Dict[str, Any]
 
 
+class LeakageRequest(BaseModel):
+    target_column: str
+    filename: str | None = None
+    dataset_id: str | None = None
+
+
 @router.post("/chat-analyst")
-async def chat_analyst(request: AnalystChatRequest):
+def chat_analyst(request: AnalystChatRequest, user: User = Depends(get_current_user)):
     try:
-        result = answer_data_scientist_question(
+        return answer_data_scientist_question(
             question=request.question,
             context=request.context,
         )
-
-        return result
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -40,28 +45,13 @@ async def chat_analyst(request: AnalystChatRequest):
 
 
 @router.post("/detect-leakage")
-def detect_leakage(payload: Dict[str, Any]):
+def detect_leakage(request: LeakageRequest, user: User = Depends(get_current_user)):
+    dataset = resolve_user_dataset(user.id, request.dataset_id, request.filename)
     try:
-        filename = payload.get("filename")
-        target_column = payload.get("target_column")
-
-        if not filename:
-            raise ValueError("filename is required.")
-
-        if not target_column:
-            raise ValueError("target_column is required.")
-
-        file_path = resolve_in(UPLOAD_DIR, filename)
-
-        if not os.path.exists(file_path):
-            raise ValueError("Uploaded dataset file not found. Run analysis first.")
-
-        result = detect_leakage_from_file(
-            file_path=file_path,
-            target_column=target_column,
+        return detect_leakage_from_file(
+            file_path=dataset_local_path(dataset),
+            target_column=request.target_column,
         )
-
-        return result
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -71,28 +61,11 @@ def detect_leakage(payload: Dict[str, Any]):
 
 
 @router.post("/generate-report")
-def generate_report(request: ReportRequest):
+def generate_report(request: ReportRequest, user: User = Depends(get_current_user)):
+    # The HTML report is stored as an artifact; download it via
+    # GET /api/artifacts/{artifact_id}/download-url
     try:
-        result = generate_intelligence_report(request.context)
-
-        return result
+        return generate_intelligence_report(request.context, owner_id=user.id)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/download-report/{filename}")
-def download_report(filename: str):
-    try:
-        file_path = resolve_in(REPORT_DIR, filename)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid file name.")
-
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Report file not found.")
-
-    return FileResponse(
-        path=file_path,
-        filename=filename,
-        media_type="text/html",
-    )
