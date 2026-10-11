@@ -100,3 +100,22 @@ def test_one_feature_counts_once_towards_the_score(tmp_path):
     # Trips both the duplicate check and the single-feature check
     assert len([f for f in result["findings"] if f["feature"] == "defaulted_copy"]) == 2
     assert result["leakage_risk_score"] == 40
+
+
+def test_target_advisor_matches_names_by_whole_word_and_text_targets_are_classification(tmp_path):
+    from services.target_advisor import recommend_target_from_file
+
+    df = _loans()
+    df["customer_id"] = [f"CUST{i:05d}" for i in range(len(df))]
+    df["segment"] = [f"segment_{i % 8}" for i in range(len(df))]
+    path = tmp_path / "data.csv"
+    df.to_csv(path, index=False)
+
+    advice = recommend_target_from_file(str(path))
+    rejected = {item["column"] for item in advice["rejected_columns"]}
+    tasks = {item["column"]: item["task_type"] for item in advice["recommended_targets"]}
+
+    assert "customer_id" in rejected
+    assert not {"paid_amount", "width", "valid_days"} & rejected
+    # Eight text classes: more than five distinct values, still classification
+    assert tasks["segment"] == "classification"

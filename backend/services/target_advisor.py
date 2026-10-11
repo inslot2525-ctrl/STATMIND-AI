@@ -2,6 +2,8 @@ import os
 import pandas as pd
 
 from services.file_reader import read_uploaded_file
+from services.leakage_detector import _name_tokens
+from services.ml_engine import detect_task_type
 
 BAD_TARGET_KEYWORDS = [
     "id",
@@ -54,17 +56,8 @@ GOOD_RESEARCH = [
 
 
 def _detect_task(series: pd.Series) -> str:
-    if (
-        series.dtype == "object"
-        or series.dtype.name == "category"
-        or series.dtype == "bool"
-    ):
-        return "classification"
-
-    if series.nunique(dropna=True) <= 5:
-        return "classification"
-
-    return "regression"
+    # Same rule the training code uses, so the advice matches what will happen
+    return detect_task_type(series.dropna())
 
 
 def recommend_target_from_file(file_path: str, domain: str = "business") -> dict:
@@ -95,7 +88,8 @@ def recommend_target_from_file(file_path: str, domain: str = "business") -> dict
 
         score = 50
 
-        if any(bad in lower for bad in BAD_TARGET_KEYWORDS):
+        # Whole-word match: 'customer_id' is an identifier, 'paid_amount' is not
+        if _name_tokens(col) & set(BAD_TARGET_KEYWORDS):
             rejected.append(
                 {
                     "column": col,
@@ -134,7 +128,7 @@ def recommend_target_from_file(file_path: str, domain: str = "business") -> dict
             score += 10
             reasons.append("Target has a manageable number of unique values.")
 
-        if unique_ratio > 0.95 and series.dtype == "object":
+        if unique_ratio > 0.95 and not pd.api.types.is_numeric_dtype(series):
             score -= 25
             warnings.append("High-cardinality text target may be hard to model.")
 

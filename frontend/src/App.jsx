@@ -911,19 +911,134 @@ function App() {
   const Dashboard = () => (
     <section>
       <div className="hero">
+        <p className="hero-kicker">AutoML you can check</p>
         <h1 className="wordmark">STATMIND</h1>
-        <p className="hero-tagline">Your explainable data science command center.</p>
-        <p className="hero-sub">
-          Upload datasets, generate statistics, detect schema, produce charts,
-          and prepare the dataset for machine learning.
+        <p className="hero-tagline">
+          From a raw spreadsheet to a tested, explained and tracked machine learning model.
         </p>
+        <p className="hero-sub">
+          Upload a CSV or Excel file. StatMind profiles it, warns you about columns that give the
+          answer away, trains and tunes every suitable algorithm with cross-validation, and shows
+          you why the winning model predicts what it does.
+        </p>
+
+        <div className="hero-actions">
+          <button className="primary" onClick={() => setCurrentPage("statistics")}>
+            Try the app
+          </button>
+          <a className="ghost-btn" href="#how-it-works">
+            See how it works
+          </a>
+        </div>
+
+        <ul className="hero-facts">
+          <li><strong>Up to 9</strong> algorithms compared</li>
+          <li><strong>5-fold</strong> cross-validation</li>
+          <li><strong>Baseline</strong> beside every score</li>
+          <li><strong>No code</strong> required</li>
+        </ul>
+      </div>
+
+      <div className="section-head" id="how-it-works">
+        <p className="eyebrow">How it works</p>
+        <h2>Four steps from data to a model you can trust</h2>
+      </div>
+
+      <ol className="step-grid">
+        <li className="step-card">
+          <span className="step-number">1</span>
+          <h3>Upload and profile</h3>
+          <p>
+            Drop in a dataset. You get the schema, a data quality score, summary statistics and
+            charts, plus a suggestion for which column to predict.
+          </p>
+        </li>
+        <li className="step-card">
+          <span className="step-number">2</span>
+          <h3>Check for leakage</h3>
+          <p>
+            StatMind tests how well each column predicts the target on its own, and flags copies,
+            derived columns and identifiers before they inflate your scores.
+          </p>
+        </li>
+        <li className="step-card">
+          <span className="step-number">3</span>
+          <h3>Run AutoML</h3>
+          <p>
+            Every suitable algorithm is cross-validated, the best two are tuned, and the winner is
+            scored once on data it has never seen. Nothing is selected on the test set.
+          </p>
+        </li>
+        <li className="step-card">
+          <span className="step-number">4</span>
+          <h3>Explain, predict, track</h3>
+          <p>
+            See which features drive the model, score new files, and keep every run, model and
+            dataset version on record.
+          </p>
+        </li>
+      </ol>
+
+      <div className="section-head">
+        <p className="eyebrow">What you get</p>
+        <h2>Results that hold up to questions</h2>
+      </div>
+
+      <div className="feature-grid">
+        <div className="feature-card">
+          <h3>Honest evaluation</h3>
+          <p>
+            Cross-validated scores with their spread, a held-out test score, and a baseline that
+            ignores the features, so you can see how much the model actually learned.
+          </p>
+        </div>
+        <div className="feature-card">
+          <h3>Explanations for every model</h3>
+          <p>
+            Permutation importance with error bars, ROC curves, a confusion matrix and per-class
+            scores, for linear models and SVMs as well as trees.
+          </p>
+        </div>
+        <div className="feature-card">
+          <h3>Leakage detection</h3>
+          <p>
+            Finds columns that predict the target suspiciously well, including categorical and
+            arithmetic leaks that a correlation check misses.
+          </p>
+        </div>
+        <div className="feature-card">
+          <h3>Sensible preprocessing</h3>
+          <p>
+            Missing values, categories, dates and imbalanced classes are handled inside the saved
+            pipeline, so predictions on new data are treated exactly the same way.
+          </p>
+        </div>
+        <div className="feature-card">
+          <h3>Experiment tracking and lineage</h3>
+          <p>
+            A built-in experiment log and model registry with stages, with optional MLflow
+            tracking and lakeFS versioning that ties each model to the exact data it was trained on.
+          </p>
+        </div>
+        <div className="feature-card">
+          <h3>An analyst to ask</h3>
+          <p>
+            Ask questions about your results in plain language and export everything as a single
+            report to share.
+          </p>
+        </div>
+      </div>
+
+      <div className="section-head">
+        <p className="eyebrow">Studios</p>
+        <h2>Jump straight to a workspace</h2>
       </div>
 
       <div className="studio-grid">
         <div className="studio-card">
           <div className="studio-tag">Statistics</div>
           <h3>Statistics Studio</h3>
-          <p>Profile datasets, detect schema, generate statistics and charts.</p>
+          <p>Upload a dataset, see its schema, quality score, statistics and charts. Start here.</p>
           <button onClick={() => setCurrentPage("statistics")}>Open</button>
         </div>
 
@@ -937,15 +1052,23 @@ function App() {
         <div className="studio-card">
           <div className="studio-tag">Prediction</div>
           <h3>Prediction Studio</h3>
-          <p>Use trained models on test datasets.</p>
+          <p>Score a new file with a saved model and download the predictions.</p>
           <button onClick={() => setCurrentPage("prediction")}>Open</button>
         </div>
 
         <div className="studio-card">
           <div className="studio-tag">MLOps</div>
           <h3>MLOps Studio</h3>
-          <p>Track experiments, manage model registry, and view dataset lineage.</p>
-          <button onClick={() => setCurrentPage("mlops")}>Open</button>
+          <p>Browse experiments, promote models through stages, and review dataset versions.</p>
+          <button
+            onClick={() => {
+              setCurrentPage("mlops");
+              setMlopsTab("experiments");
+              fetchExperiments();
+            }}
+          >
+            Open
+          </button>
         </div>
 
         <div className="studio-card">
@@ -954,6 +1077,16 @@ function App() {
           <p>Ask questions about your data and models, and export the full report.</p>
           <button onClick={() => setCurrentPage("analyst")}>Open</button>
         </div>
+      </div>
+
+      <div className="cta-band">
+        <div>
+          <h2>Ready to try it on your own data?</h2>
+          <p>Upload a CSV or Excel file up to 50 MB. A first model takes a couple of minutes.</p>
+        </div>
+        <button className="primary" onClick={() => setCurrentPage("statistics")}>
+          Try the app
+        </button>
       </div>
     </section>
   );
@@ -1479,10 +1612,15 @@ function App() {
   return (
     <div className="shell">
       <header className="topbar">
-        <div className="brand">
-          <div className="brand-icon">StatMind</div>
-          <p>Data Intelligence OS</p>
-        </div>
+        <button
+          type="button"
+          className="brand"
+          onClick={goToDashboard}
+          aria-label="StatMind, go to the dashboard"
+        >
+          <span className="brand-icon">StatMind</span>
+          <span className="brand-tagline">Data Intelligence OS</span>
+        </button>
 
         <nav className="top-nav">
           {[

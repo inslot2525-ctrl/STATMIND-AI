@@ -32,6 +32,44 @@ Upload data → Get intelligence. That's it.
 
 ---
 
+## 📸 A look inside
+
+**Dashboard**
+
+![Dashboard](docs/screenshots/dashboard.png)
+
+**AutoML leaderboard** — every algorithm cross-validated, the top two tuned, a feature-blind baseline for reference
+
+![AutoML leaderboard](docs/screenshots/automl-leaderboard.png)
+
+**Model diagnostics** — permutation importance with error bars, ROC curve, confusion matrix, per-class scores
+
+![Model diagnostics](docs/screenshots/model-diagnostics.png)
+
+**Test-split metrics, each with the baseline's value underneath**
+
+![Test metrics](docs/screenshots/test-metrics.png)
+
+**Lineage** — the MLflow registry version, and the lakeFS commits holding the training data and the model
+
+![Saved model with MLflow and lakeFS lineage](docs/screenshots/saved-model-lineage.png)
+
+**Leakage check** — how well each feature predicts the target on its own
+
+![Leakage check](docs/screenshots/leakage-check.png)
+
+**Statistics Studio**
+
+![Statistics Studio](docs/screenshots/statistics-studio.png)
+
+Screenshots use a synthetic customer-churn dataset (1,500 rows).
+
+**Further reading:** [how the code works, module by module](docs/WALKTHROUGH.md) ·
+[design decisions and their trade-offs](docs/DESIGN_DECISIONS.md) ·
+[hosting a public demo](docs/DEPLOY.md)
+
+---
+
 ## ⚡ Features That Go Crazy
 
 ### 📊 Statistics Studio
@@ -146,8 +184,8 @@ These are heuristics that point at columns to review; they are not proof either 
 
 ---
 
-### 💬 AI Data Scientist Chatbot
-An embedded analyst that answers from the results StatMind has computed for your dataset — metrics, baseline, cross-validation scores, feature importance, the AutoML leaderboard and leakage findings:
+### 💬 AI Analyst
+A chat page with an embedded analyst that answers from the results StatMind has computed for your dataset — metrics, baseline, cross-validation scores, feature importance, the AutoML leaderboard and leakage findings:
 - "Can I trust this model's score?"
 - "Which features matter most, and why?"
 - "What should I do next to improve the model?"
@@ -157,13 +195,29 @@ With `ANTHROPIC_API_KEY` set it is answered by Claude. Without a key, or if the 
 ---
 
 ### 📄 Intelligence Report Generator
-One click. Full HTML report. Contains:
+One click on the AI Analyst page. Full HTML report. Contains:
 - Dataset summary and quality analysis
 - Domain insights
-- ML model performance
+- ML model performance and the AutoML comparison
+- Leakage findings
 - Recommendations
 
 Download it. Send it. Look extremely smart in meetings.
+
+---
+
+### 🧬 MLOps Studio
+Everything the app trains is tracked, with no setup:
+
+- **Experiments**: every training run with its hyperparameters, test metrics and, for AutoML, cross-validation scores
+- **Model registry**: every saved model, with stages you can move it through (development → staging → production → archived)
+- **Datasets**: every upload, identified by content hash, so the same file is never stored twice
+
+Two optional integrations plug real MLOps tools into the same flow (details under
+[MLOps stack](#-mlops-stack)):
+
+- **MLflow** — runs, AutoML candidates as child runs, and a model registry whose `production` alias follows the stage you set here
+- **lakeFS** — a commit per dataset and per model, so each model records exactly which data it was trained on
 
 ---
 
@@ -177,9 +231,9 @@ statmind-ai/
 │   ├── database.py           # SQLAlchemy models (users, datasets, jobs, ...)
 │   ├── migrations/           # Alembic schema migrations (run automatically)
 │   ├── worker.py             # Standalone background job worker
-│   ├── manage.py             # Admin CLI: create-user, claim-legacy-data
+│   ├── manage.py             # Admin CLI: create-user, claim-legacy-data, import-local-files
 │   ├── routes/
-│   │   ├── auth_routes.py          # /api/auth/register, /login, /me
+│   │   ├── auth_routes.py          # /api/auth/config, /register, /login, /me
 │   │   ├── analysis_routes.py      # /api/analyze, /api/datasets
 │   │   ├── target_routes.py        # /api/recommend-target
 │   │   ├── ml_routes.py            # /api/train-model, /api/compare-models (jobs), registries
@@ -188,7 +242,7 @@ statmind-ai/
 │   │   ├── artifact_routes.py      # /api/artifacts (signed download links)
 │   │   └── intelligence_routes.py  # /api/chat-analyst, /api/detect-leakage, /api/generate-report
 │   └── services/
-│       ├── auth.py                 # Password hashing, JWT, current-user dependency
+│       ├── auth.py                 # Password hashing, JWT, current-user dependency, optional login
 │       ├── jobs.py, job_tasks.py   # Database-backed job queue and its tasks
 │       ├── storage.py              # Local / S3 / lakeFS storage, content-addressed uploads
 │       ├── lakefs_versioning.py    # lakeFS commits and data lineage (optional)
@@ -207,7 +261,12 @@ statmind-ai/
         ├── AnalystPanel.jsx  # AI analyst chat and report export
         ├── AuthScreen.jsx    # Login / registration
         ├── api.js            # API client: tokens, job polling, downloads
-        └── App.css           # Dark glassmorphism design system
+        ├── App.css           # Base dark theme
+        ├── polish.css        # Light-catching borders, motion and type refinements
+        └── spotlight.js      # Pointer-following border highlight
+
+tests/                        # pytest suite: API, auth, isolation, jobs, storage, AutoML, leakage, MLflow, lakeFS
+start-dev.ps1                 # Starts lakeFS + MLflow + API + app locally (Windows)
 ```
 
 ---
@@ -250,7 +309,8 @@ Backend runs at → `http://localhost:8000`
 API docs → `http://localhost:8000/docs`
 
 Locally this needs no extra services: SQLite, files on disk, and background jobs
-run in a worker thread inside the API. In local development there is no login
+run in a worker thread inside the API. MLflow and lakeFS are optional and off unless
+configured. In local development there is no login
 screen: everything belongs to one built-in local user. Set `AUTH_REQUIRED=true` to
 turn accounts on, after which every dataset, model and experiment is private to its
 owner. Production (`STATMIND_ENV=production`) always requires login.
@@ -286,19 +346,21 @@ pytest            # from the repo root; uses a throwaway data dir, never your re
 docker compose up --build
 ```
 
-Runs Postgres, the API, a separate job worker and the frontend, the same shape as production.
+Runs Postgres, the API, a separate job worker, an MLflow server (http://localhost:5000) and the
+frontend. The compose file does not set `STATMIND_ENV`, so it runs without a login screen; add
+`AUTH_REQUIRED: "true"` to the backend environment to turn accounts on.
 
 ### Configuration
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `STATMIND_ENV` | `development` | Set to `production` to refuse to start without `JWT_SECRET`. |
+| `STATMIND_ENV` | `development` | Set to `production` to require login and refuse to start without `JWT_SECRET`. |
 | `JWT_SECRET` | random per start | Signs login tokens and download links. **Required in production** (32+ random characters). |
 | `ACCESS_TOKEN_MINUTES` | `720` | How long a login lasts. |
 | `AUTH_REQUIRED` | `false` in development, `true` otherwise | `false` skips the login screen and runs as one local user. Cannot be `false` in production. |
 | `ALLOW_REGISTRATION` | `true` | Set `false` to allow only accounts created with `manage.py create-user`. |
 | `DATABASE_URL` | SQLite in `STATMIND_DATA_DIR` | Any SQLAlchemy URL. `postgres://...` URLs (Railway, Heroku) are accepted as-is. Schema migrations run automatically on startup. |
-| `STORAGE_BACKEND` | `local` | `local` (files under `STATMIND_DATA_DIR`) or `s3` (AWS S3, Cloudflare R2, MinIO). |
+| `STORAGE_BACKEND` | `local` | `local` (files under `STATMIND_DATA_DIR`) or `s3` (AWS S3, Cloudflare R2, MinIO). Setting `LAKEFS_ENDPOINT` overrides it with lakeFS. |
 | `S3_BUCKET` / `S3_ENDPOINT_URL` / `S3_REGION` / `S3_PREFIX` | — | Bucket settings for `STORAGE_BACKEND=s3`. Leave the endpoint empty for AWS; set it for R2/MinIO. Credentials come from `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`. |
 | `JOB_BACKEND` | `thread` | `thread`: the API also runs jobs. `worker`: the API only queues them; run `python worker.py` separately. |
 | `JOB_STALE_SECONDS` / `JOB_MAX_ATTEMPTS` | `120` / `3` | A job whose worker stops responding is retried, then failed. |
@@ -320,10 +382,13 @@ Runs Postgres, the API, a separate job worker and the frontend, the same shape a
 
 ## 🔌 API Reference
 
-All endpoints except registration, login and health need an `Authorization: Bearer <token>` header.
+When login is required (`AUTH_REQUIRED=true`, always in production), every endpoint except
+`/api/auth/config`, registration, login and health needs an `Authorization: Bearer <token>` header.
+In local development requests without a token act as the built-in local user.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| `GET`  | `/api/auth/config` | Whether this server requires login |
 | `POST` | `/api/auth/register` | Create an account (JSON `email`, `password`) → token |
 | `POST` | `/api/auth/login` | Log in (form `username`, `password`) → token |
 | `GET`  | `/api/auth/me` | The current user |
@@ -334,14 +399,22 @@ All endpoints except registration, login and health need an `Authorization: Bear
 | `GET`  | `/api/jobs/{id}` | Job status, progress, and result when finished |
 | `POST` | `/api/predict-test-data` | Run predictions with a saved model |
 | `GET`  | `/api/artifacts/{id}/download-url` | Short-lived link to download a prediction CSV or report |
-| `POST` | `/api/chat-analyst` | Ask the AI data scientist |
+| `POST` | `/api/chat-analyst` | Ask the AI analyst (JSON `question`, `context`, optional `history`) |
 | `POST` | `/api/detect-leakage` | Data leakage detection |
 | `POST` | `/api/generate-report` | Generate HTML intelligence report |
 | `GET`  | `/api/datasets`, `/api/models/`, `/api/experiments/` | Your registries |
+| `POST` | `/api/models/{id}/transition?stage=...` | Move a model to `development`, `staging`, `production` or `archived` |
 
 Full interactive docs at `/docs` (FastAPI Swagger UI; use **Authorize** to log in).
 
-### One command for the local MLOps stack (Windows)
+---
+
+## 🧬 MLOps stack
+
+Both integrations are optional and independent. Without them StatMind still tracks experiments,
+models and datasets in its own database.
+
+### One command for the local stack (Windows)
 
 ```powershell
 .\start-dev.ps1          # lakeFS + MLflow + API + app, each in its own window
@@ -408,13 +481,18 @@ Models are stored in MLflow with cloudpickle and include StatMind's own preproce
 loading one outside this codebase needs `backend/` on the Python path. `docker compose up` starts
 an MLflow service and wires it up automatically.
 
-### Deploying (e.g. Railway)
+---
+
+## 🚢 Deploying (e.g. Railway)
+
+Step-by-step instructions for Railway + Vercel are in [docs/DEPLOY.md](docs/DEPLOY.md). In short:
 
 1. Add a **Postgres** database; set `DATABASE_URL` on the API.
 2. Create a bucket on **Cloudflare R2** (or S3); set `STORAGE_BACKEND=s3` and the `S3_*` / `AWS_*` variables.
    Without a bucket, attach a persistent volume at `/data` instead.
 3. Set `STATMIND_ENV=production`, a long random `JWT_SECRET`, and `ALLOWED_ORIGIN_REGEX` for your Vercel URL.
 4. For heavy training, set `JOB_BACKEND=worker` and add a second service from the same image with start command `python worker.py` and the same variables.
+5. Optional: set `ANTHROPIC_API_KEY` for the Claude-backed analyst, and `MLFLOW_TRACKING_URI` / `LAKEFS_*` if you run those services.
 
 ---
 
@@ -465,9 +543,11 @@ an MLflow service and wires it up automatically.
 - [ ] NLP / text column analysis
 - [ ] Per-prediction explanations (SHAP values)
 - [ ] Model serving endpoint and drift monitoring
+- [ ] lakeFS branches per experiment, with merge and revert from the UI
 - [ ] Multi-file join and merge studio
 - [ ] Export to Jupyter Notebook
-- [ ] Deploy to cloud (Docker + Railway / Render)
+- [x] Docker images, compose stack and Railway / Vercel deploy configs
+- [ ] Public hosted demo
 
 ---
 
