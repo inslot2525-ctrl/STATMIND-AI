@@ -304,6 +304,8 @@ Runs Postgres, the API, a separate job worker and the frontend, the same shape a
 | `MAX_UPLOAD_MB` | `50` | Maximum upload size. |
 | `ALLOWED_ORIGINS` | localhost dev ports | Comma-separated CORS origins. |
 | `ALLOWED_ORIGIN_REGEX` | `https://.*\.vercel\.app` | CORS origin regex; narrow it to your own Vercel project. |
+| `MLFLOW_TRACKING_URI` | — | Set to an MLflow server (for example `http://127.0.0.1:5000`) to also log every trained model to MLflow. Unset: StatMind uses only its own experiment tables. |
+| `MLFLOW_EXPERIMENT` / `MLFLOW_UI_URL` | `statmind` / the tracking URI | MLflow experiment name, and the address a browser uses for "open in MLflow" links. |
 | `ANTHROPIC_API_KEY` | — | Enables the Claude-backed AI analyst. Without it the analyst uses built-in rules. Keep it in the environment, never in the repo. |
 | `ANALYST_MODEL` / `ANALYST_LLM` | `claude-opus-5-5` / `auto` | Model used by the analyst; set `ANALYST_LLM=off` to force the built-in rules. |
 | `LOG_LEVEL` | `INFO` | Backend log level. |
@@ -332,6 +334,33 @@ All endpoints except registration, login and health need an `Authorization: Bear
 | `GET`  | `/api/datasets`, `/api/models/`, `/api/experiments/` | Your registries |
 
 Full interactive docs at `/docs` (FastAPI Swagger UI; use **Authorize** to log in).
+
+### MLflow (optional)
+
+StatMind keeps its own experiment log and model registry. Point it at an MLflow server and every
+trained model is logged there as well:
+
+```bash
+# terminal 1: MLflow UI and registry at http://127.0.0.1:5000
+mlflow server --port 5000 --backend-store-uri sqlite:///mlflow.db --artifacts-destination ./mlartifacts
+
+# terminal 2: the StatMind API, logging to it  (PowerShell: $env:MLFLOW_TRACKING_URI = "...")
+cd backend
+MLFLOW_TRACKING_URI=http://127.0.0.1:5000 uvicorn main:app --port 8000
+```
+
+- **Runs**: parameters, hyperparameters, test metrics, the baseline's metrics and cross-validation
+  scores, plus feature importance, diagnostics and schema as JSON artifacts.
+- **AutoML**: the winner is the parent run and every candidate on the leaderboard is a child run,
+  so the whole comparison can be charted in MLflow.
+- **Registry**: each model becomes a new version of `statmind-<target column>`. Moving a model to
+  staging or production in MLOps Studio moves the matching MLflow alias, so
+  `models:/statmind-<target>@production` always loads the model StatMind has in production.
+- If the MLflow server is down, training still succeeds; the run is simply not logged there.
+
+Models are stored in MLflow with cloudpickle and include StatMind's own preprocessing classes, so
+loading one outside this codebase needs `backend/` on the Python path. `docker compose up` starts
+an MLflow service and wires it up automatically.
 
 ### Deploying (e.g. Railway)
 
@@ -362,6 +391,7 @@ Full interactive docs at `/docs` (FastAPI Swagger UI; use **Authorize** to log i
 - [boto3](https://boto3.amazonaws.com/) — S3 / R2 / MinIO storage
 - [scikit-learn](https://scikit-learn.org/) — ML algorithms, cross-validation, tuning, permutation importance
 - [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python) — Claude-backed AI analyst (optional)
+- [MLflow](https://mlflow.org/) — experiment tracking and model registry (optional)
 - [pandas](https://pandas.pydata.org/) — data manipulation
 - [numpy](https://numpy.org/) — numerical computing
 - [uvicorn](https://www.uvicorn.org/) — ASGI server
@@ -381,6 +411,7 @@ Full interactive docs at `/docs` (FastAPI Swagger UI; use **Authorize** to log i
 - [x] Cross-validated AutoML with tuning, baselines and a saved winner
 - [x] Model-agnostic explainability (permutation importance, ROC, confusion matrix)
 - [x] LLM-backed AI analyst
+- [x] MLflow experiment tracking and model registry
 - [ ] OAuth login (Google / GitHub) and password reset
 - [ ] Time series forecasting module
 - [ ] NLP / text column analysis

@@ -2,6 +2,7 @@ import json
 from datetime import datetime
 
 from database import SessionLocal, ModelRegistry
+from services import mlflow_tracking
 
 VALID_STAGES = ["development", "staging", "production", "archived"]
 
@@ -134,6 +135,10 @@ def transition_model_stage(model_id, stage, owner_id, version=None):
         obj.metadata_json = json.dumps(meta, default=str)
         obj.updated_at = datetime.now().isoformat()
         db.commit()
+
+        # Keep the MLflow model version's stage and aliases in step, if it has one
+        mlflow_tracking.sync_stage(meta.get("mlflow"), stage)
+
         return _to_dict(obj)
     finally:
         db.close()

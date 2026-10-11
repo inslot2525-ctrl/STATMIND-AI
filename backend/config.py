@@ -76,6 +76,17 @@ JOB_POLL_SECONDS = float(_env("JOB_POLL_SECONDS", "1"))
 JOB_STALE_SECONDS = _env_int("JOB_STALE_SECONDS", 120)
 JOB_MAX_ATTEMPTS = _env_int("JOB_MAX_ATTEMPTS", 3)
 
+# --- MLflow (optional) ----------------------------------------------------
+# Set MLFLOW_TRACKING_URI (for example http://127.0.0.1:5000) to also log every
+# trained model to MLflow. Unset: StatMind tracks experiments in its own tables only.
+MLFLOW_TRACKING_URI = _env("MLFLOW_TRACKING_URI")
+MLFLOW_EXPERIMENT = _env("MLFLOW_EXPERIMENT", "statmind")
+# Where a browser reaches the MLflow UI, for "open in MLflow" links
+MLFLOW_UI_URL = _env(
+    "MLFLOW_UI_URL",
+    MLFLOW_TRACKING_URI if (MLFLOW_TRACKING_URI or "").startswith("http") else None,
+)
+
 # --- AI analyst -----------------------------------------------------------
 # auto : answer with Claude when Anthropic credentials are configured, else with built-in rules
 # off  : always use the built-in rules

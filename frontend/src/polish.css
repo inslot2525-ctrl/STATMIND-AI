@@ -849,6 +849,22 @@ button,
   border-color: var(--edge-bright);
 }
 
+.text-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--soft);
+  font-size: 14px;
+  text-decoration: underline;
+  text-decoration-color: var(--edge-bright);
+  text-underline-offset: 4px;
+  transition: color 0.25s var(--ease), text-decoration-color 0.25s var(--ease);
+}
+
+.text-link:hover {
+  color: #ffffff;
+  text-decoration-color: #ffffff;
+}
+
 /* ── Scrollbar ──────────────────────────────────────────────────────────── */
 
 * {

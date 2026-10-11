@@ -49,3 +49,9 @@ backend/statmind.db-journal
 
 *.db-shm
 *.db-wal
+
+# Local MLflow store
+mlflow-data/
+mlruns/
+mlartifacts/
+mlflow.db

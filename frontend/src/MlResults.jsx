@@ -372,6 +372,20 @@ export function ModelReport({ result }) {
           <span>Model ID</span>
           <strong>{result.model_id}</strong>
         </div>
+        {result.mlflow && (
+          <div className="result-box">
+            <span>MLflow registry</span>
+            <strong>
+              {result.mlflow.registered_model}
+              {result.mlflow.version && ` · version ${result.mlflow.version}`}
+            </strong>
+            {result.mlflow.run_url && (
+              <a className="text-link" href={result.mlflow.run_url} target="_blank" rel="noreferrer">
+                Open this run in MLflow
+              </a>
+            )}
+          </div>
+        )}
         <Notes items={result.model_explanation} />
       </div>
 

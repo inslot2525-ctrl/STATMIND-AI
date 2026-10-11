@@ -13,6 +13,7 @@ from pandas.api.types import is_bool_dtype, is_datetime64_any_dtype, is_numeric_
 
 from services.file_reader import read_uploaded_file
 from services.experiment_tracker import log_experiment
+from services import mlflow_tracking
 from services.model_registry import get_model_record, register_model
 from services.artifacts import create_artifact
 from services.storage import TMP_DIR, get_storage, make_key, safe_component
@@ -903,11 +904,13 @@ def _finalize_model(
     owner_id: str = None,
     progress: ProgressFn = None,
     cross_validation: dict = None,
+    leaderboard: list = None,
 ) -> dict:
     """
     Score a pipeline already fitted on the training split against the test
     split, explain it, save it and register it. Shared by single-model training
-    and by the AutoML winner. cross_validation carries the AutoML scores, if any.
+    and by the AutoML winner. cross_validation and leaderboard carry the AutoML
+    scores, if any.
     """
     task_type = data["task_type"]
 
@@ -949,40 +952,10 @@ def _finalize_model(
     _report(progress, 92, "Saving and registering the model")
     model_id, model_key = save_trained_model(pipeline, metadata)
 
-    # ── MLOps: register model and log experiment ──────────────────
-    # Registration is required: models are only reachable through the registry.
-    full_metadata = {
-        **metadata,
-        "model_id": model_id,
-        "metrics": metrics,
-        "baseline_metrics": baseline_metrics,
-        "hyperparameters": hyperparameters,
-    }
-    if cross_validation:
-        full_metadata["cross_validation"] = cross_validation
-    if dataset_id:
-        full_metadata["dataset_id"] = dataset_id
-    register_model(model_id, full_metadata, owner_id=owner_id, storage_key=model_key)
-
-    experiment_id = None
-    if dataset_id and owner_id:
-        try:
-            experiment_id = log_experiment(
-                owner_id=owner_id,
-                dataset_id=dataset_id,
-                algorithm=algorithm,
-                hyperparameters={"test_size": float(test_size), **hyperparameters},
-                metrics={**metrics, **({"cross_validation": cross_validation} if cross_validation else {})},
-                model_id=model_id,
-                tags=["automl"] if cross_validation else [],
-            )
-        except Exception:
-            logger.exception("Experiment logging failed for model %s", model_id)
-    # ─────────────────────────────────────────────────────────────
-
     result = {
         "model_id": model_id,
-        "experiment_id": experiment_id,
+        "experiment_id": None,
+        "mlflow": None,
         "task_type": task_type,
         "algorithm": algorithm,
         "target_column": target_column,
@@ -1032,6 +1005,50 @@ def _finalize_model(
     result["warnings"].append(
         "Trained model has been saved and can be used in Prediction Studio."
     )
+
+    # ── MLOps: MLflow (if configured), model registry, experiment log ──
+    if mlflow_tracking.enabled():
+        _report(progress, 95, "Logging the run to MLflow")
+        result["mlflow"] = mlflow_tracking.log_training_run(
+            pipeline,
+            result,
+            model_id=model_id,
+            dataset_id=dataset_id,
+            owner_id=owner_id,
+            leaderboard=leaderboard,
+        )
+
+    # Registration is required: models are only reachable through the registry.
+    full_metadata = {
+        **metadata,
+        "model_id": model_id,
+        "metrics": metrics,
+        "baseline_metrics": baseline_metrics,
+        "hyperparameters": hyperparameters,
+    }
+    if cross_validation:
+        full_metadata["cross_validation"] = cross_validation
+    if dataset_id:
+        full_metadata["dataset_id"] = dataset_id
+    if result["mlflow"]:
+        full_metadata["mlflow"] = result["mlflow"]
+    register_model(model_id, full_metadata, owner_id=owner_id, storage_key=model_key)
+
+    if dataset_id and owner_id:
+        try:
+            result["experiment_id"] = log_experiment(
+                owner_id=owner_id,
+                dataset_id=dataset_id,
+                algorithm=algorithm,
+                hyperparameters={"test_size": float(test_size), **hyperparameters},
+                metrics={**metrics, **({"cross_validation": cross_validation} if cross_validation else {})},
+                model_id=model_id,
+                tags=["automl"] if cross_validation else [],
+                notes=f"MLflow run {result['mlflow']['run_id']}" if result["mlflow"] else None,
+            )
+        except Exception:
+            logger.exception("Experiment logging failed for model %s", model_id)
+    # ─────────────────────────────────────────────────────────────
 
     return result
 
@@ -1277,6 +1294,7 @@ def compare_models_from_file(
             "std": winner["cv_std"],
             "tuned": winner["tuned"],
         },
+        leaderboard=final_leaderboard,
     )
 
     warnings_list = [
