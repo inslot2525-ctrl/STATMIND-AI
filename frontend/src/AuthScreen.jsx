@@ -28,11 +28,8 @@ function AuthScreen({ onAuthenticated, notice }) {
     <div className="auth-page">
       <div className="auth-card">
         <div className="logo-block">
-          <div className="logo-icon">S</div>
-          <div>
-            <h1>STATMIND</h1>
-            <p>Data Intelligence OS</p>
-          </div>
+          <div className="logo-icon">StatMind</div>
+          <p>Data Intelligence OS</p>
         </div>
 
         <div className="auth-copy">

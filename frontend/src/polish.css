@@ -1,0 +1,873 @@
+/*
+ * Polish layer, loaded after App.css: light-catching borders and white motion.
+ *
+ * Every "surface" (cards, tiles, the hero) gets its border drawn by an ::after
+ * ring made of three layers:
+ *   1. a spotlight that follows the pointer (--mx / --my are set by spotlight.js)
+ *   2. on featured surfaces, a streak of light that travels around the edge
+ *   3. a static diagonal sheen, bright at two corners
+ * The ring is masked down to a 1px frame, so each surface keeps its own fill.
+ */
+
+@property --spot {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --edge-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+:root {
+  --edge-soft: rgba(255, 255, 255, 0.07);
+  --edge: rgba(255, 255, 255, 0.16);
+  --edge-bright: rgba(255, 255, 255, 0.42);
+  --border: rgba(255, 255, 255, 0.11);
+  --border-soft: rgba(255, 255, 255, 0.07);
+}
+
+/* ── Page backdrop: a fine dot grid that fades toward the edges ─────────── */
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.11) 1px, transparent 1.4px);
+  background-size: 28px 28px;
+  -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 22%, #000 10%, transparent 78%);
+  mask-image: radial-gradient(ellipse 75% 65% at 50% 22%, #000 10%, transparent 78%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Surfaces: the light-catching ring ──────────────────────────────────── */
+
+.card,
+.upload-card,
+.studio-card,
+.summary-card,
+.chart-card,
+.hero,
+.auth-card,
+.finding {
+  --mx: 50%;
+  --my: 0px;
+  position: relative;
+  border-color: transparent;
+  transition: --spot 0.45s ease, transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card::after,
+.upload-card::after,
+.studio-card::after,
+.summary-card::after,
+.chart-card::after,
+.hero::after,
+.auth-card::after,
+.finding::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background:
+    radial-gradient(
+      340px circle at var(--mx) var(--my),
+      rgba(255, 255, 255, calc(0.95 * var(--spot))),
+      transparent 62%
+    ),
+    linear-gradient(
+      140deg,
+      var(--edge-bright),
+      var(--edge-soft) 30%,
+      var(--edge-soft) 68%,
+      rgba(255, 255, 255, 0.26)
+    );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.card:hover,
+.upload-card:hover,
+.studio-card:hover,
+.summary-card:hover,
+.chart-card:hover,
+.hero:hover,
+.auth-card:hover,
+.finding:hover {
+  --spot: 1;
+}
+
+/* A faint wash of the same spotlight inside the surface */
+.card,
+.upload-card,
+.studio-card,
+.summary-card,
+.chart-card,
+.finding {
+  background-image: radial-gradient(
+    520px circle at var(--mx) var(--my),
+    rgba(255, 255, 255, calc(0.045 * var(--spot))),
+    transparent 60%
+  );
+}
+
+/* ── Featured surfaces: light travelling around the edge ────────────────── */
+
+@keyframes edge-travel {
+  to {
+    --edge-angle: 360deg;
+  }
+}
+
+.hero::after,
+.auth-card::after,
+.studio-card:hover::after {
+  background:
+    radial-gradient(
+      340px circle at var(--mx) var(--my),
+      rgba(255, 255, 255, calc(0.95 * var(--spot))),
+      transparent 62%
+    ),
+    conic-gradient(
+      from var(--edge-angle),
+      transparent 0deg,
+      transparent 250deg,
+      rgba(255, 255, 255, 0.12) 295deg,
+      rgba(255, 255, 255, 0.7) 340deg,
+      rgba(255, 255, 255, 0.12) 356deg,
+      transparent 360deg
+    ),
+    linear-gradient(
+      140deg,
+      var(--edge-bright),
+      var(--edge-soft) 30%,
+      var(--edge-soft) 68%,
+      rgba(255, 255, 255, 0.26)
+    );
+  animation: edge-travel 14s linear infinite;
+}
+
+.studio-card:hover::after {
+  animation-duration: 6s;
+}
+
+.studio-card:hover {
+  border-color: transparent;
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.45),
+    0 0 60px rgba(255, 255, 255, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.summary-card:hover {
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(255, 255, 255, 0.05);
+}
+
+/* ── Top bar ────────────────────────────────────────────────────────────── */
+
+.topbar {
+  border-bottom-color: transparent;
+}
+
+/* A highlight that drifts along the bottom edge */
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    var(--edge-soft) 0%,
+    var(--edge-soft) 35%,
+    rgba(255, 255, 255, 0.9) 50%,
+    var(--edge-soft) 65%,
+    var(--edge-soft) 100%
+  );
+  background-size: 220% 100%;
+  animation: line-drift 7s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes line-drift {
+  from { background-position: 100% 0; }
+  to { background-position: 0% 0; }
+}
+
+.brand-icon,
+.logo-icon {
+  background: linear-gradient(145deg, #ffffff, #bdbdbd 55%, #6f6f6f);
+  color: #050505;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.35),
+    0 0 22px rgba(255, 255, 255, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  animation: icon-breathe 4.5s ease-in-out infinite;
+}
+
+@keyframes icon-breathe {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.35),
+      0 0 18px rgba(255, 255, 255, 0.16),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.6),
+      0 0 34px rgba(255, 255, 255, 0.34),
+      inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  }
+}
+
+/* The logo is the name itself, set as a badge */
+.brand-icon,
+.logo-icon {
+  width: auto;
+  height: 42px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.brand p,
+.logo-block p {
+  margin: 0;
+  letter-spacing: 0.04em;
+}
+
+.top-nav button.active {
+  border-color: var(--edge-bright);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+  box-shadow: 0 0 22px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.top-nav button:hover {
+  border-color: var(--edge);
+}
+
+.top-nav button::after {
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.7);
+}
+
+/* ── Hero ───────────────────────────────────────────────────────────────── */
+
+/* A band of light sweeps across the wordmark */
+.wordmark {
+  background: linear-gradient(
+    100deg,
+    #8f8f8f 0%,
+    #d9d9d9 30%,
+    #ffffff 46%,
+    #ffffff 54%,
+    #d9d9d9 70%,
+    #8f8f8f 100%
+  );
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 34px rgba(255, 255, 255, 0.18));
+  animation: wordmark-sweep 6s ease-in-out infinite alternate;
+}
+
+@keyframes wordmark-sweep {
+  from { background-position: 100% 0; }
+  to { background-position: 0% 0; }
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.eyebrow::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.9);
+  animation: dot-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 0.45; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+/* ── Headings inside cards ──────────────────────────────────────────────── */
+
+.card > h3,
+.analyst-head h3 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.card > h3::before,
+.analyst-head h3::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 3px;
+  height: 20px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffffff, rgba(255, 255, 255, 0.25));
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.55);
+}
+
+.studio-tag {
+  border-color: var(--edge);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+/* ── Tiles ──────────────────────────────────────────────────────────────── */
+
+.summary-card {
+  background-color: rgba(8, 8, 8, 0.86);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+
+.summary-card strong {
+  background: linear-gradient(180deg, #ffffff 30%, #b9b9b9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
+
+.primary,
+.login-form button,
+.studio-card button {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, #ffffff, #cfcfcf);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.5),
+    0 10px 30px rgba(255, 255, 255, 0.1),
+    inset 0 1px 0 #ffffff;
+}
+
+/* A sheen crosses the button on hover */
+.primary::after,
+.login-form button::after,
+.studio-card button::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -60%;
+  width: 45%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+  transform: skewX(-18deg);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.primary:hover:not(:disabled)::after,
+.login-form button:hover:not(:disabled)::after,
+.studio-card button:hover::after {
+  opacity: 1;
+  animation: sheen 0.9s ease;
+}
+
+@keyframes sheen {
+  from { left: -60%; }
+  to { left: 130%; }
+}
+
+.primary:hover:not(:disabled),
+.login-form button:hover:not(:disabled),
+.studio-card button:hover {
+  box-shadow:
+    0 0 0 1px #ffffff,
+    0 14px 44px rgba(255, 255, 255, 0.22),
+    inset 0 1px 0 #ffffff;
+}
+
+.primary.green {
+  background: linear-gradient(135deg, var(--green), #14b8a6);
+  box-shadow:
+    0 0 0 1px rgba(34, 197, 94, 0.6),
+    0 10px 30px rgba(34, 197, 94, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.primary.green:hover:not(:disabled) {
+  box-shadow:
+    0 0 0 1px rgba(134, 239, 172, 0.9),
+    0 14px 44px rgba(34, 197, 94, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.back-btn,
+.logout-btn,
+.user-menu button,
+.suggest-btn,
+.chat-suggestions button {
+  border-color: var(--edge);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, color 0.25s ease, background 0.25s ease;
+}
+
+.back-btn:hover,
+.logout-btn:hover,
+.user-menu button:hover,
+.suggest-btn:hover:not(:disabled),
+.chat-suggestions button:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 0 22px rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+/* ── Inputs ─────────────────────────────────────────────────────────────── */
+
+.login-form input,
+.input-group input,
+.input-group select,
+.chat-form input {
+  border-color: var(--edge);
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+.login-form input:hover,
+.input-group input:hover,
+.input-group select:hover,
+.chat-form input:hover {
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+.login-form input:focus,
+.input-group input:focus,
+.input-group select:focus,
+.chat-form input:focus {
+  border-color: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.09), 0 0 26px rgba(255, 255, 255, 0.12);
+  background: rgba(12, 12, 12, 0.9);
+}
+
+/* ── Tables and lists ───────────────────────────────────────────────────── */
+
+.table-wrapper {
+  border-color: var(--edge);
+}
+
+.preview-table th {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05));
+  border-bottom-color: var(--edge);
+}
+
+.preview-table tbody tr {
+  transition: background 0.2s ease;
+}
+
+.preview-table tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+}
+
+.preview-table tr.winner td:first-child {
+  box-shadow: inset 3px 0 0 var(--green);
+}
+
+.feature-row {
+  transition: padding 0.2s ease, background 0.2s ease;
+}
+
+.feature-row:hover {
+  padding-left: 10px;
+  padding-right: 10px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.06), transparent);
+}
+
+.notice,
+.result-box {
+  border-color: var(--edge);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.empty,
+.empty-small {
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.chat-message {
+  border-color: var(--edge);
+}
+
+.chat-message.user {
+  border-color: var(--edge-bright);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.05));
+}
+
+/* ── Job progress: light running through the bar ────────────────────────── */
+
+.job-progress-track {
+  box-shadow: inset 0 0 0 1px var(--edge);
+}
+
+.job-progress-fill {
+  background: linear-gradient(90deg, #8f8f8f, #ffffff 45%, #ffffff 55%, #8f8f8f);
+  background-size: 200% 100%;
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.55);
+  animation: progress-flow 1.4s linear infinite;
+}
+
+@keyframes progress-flow {
+  from { background-position: 200% 0; }
+  to { background-position: 0% 0; }
+}
+
+/* ══ Smoothness ═══════════════════════════════════════════════════════════
+ * Rendering cost, motion and type. The rules above decide what things look
+ * like; these decide how calmly they move and how cleanly they draw.
+ */
+
+:root {
+  --ease: cubic-bezier(0.22, 0.8, 0.24, 1);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Blurring whatever is behind every card, every frame, is what made scrolling
+   stutter. The cards are near-opaque, so the blur was invisible anyway; only
+   the top bar, which content really does pass under, keeps it. */
+.card,
+.upload-card,
+.studio-card,
+.hero,
+.auth-card {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* The drifting background glows live on their own compositor layers */
+body::before,
+.shell::before,
+.shell::after {
+  will-change: transform;
+}
+
+/* Pages ease in when you switch to them */
+.page {
+  animation: page-in 0.45s var(--ease) both;
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Results ease in instead of popping */
+.page .card,
+.page .summary-grid,
+.page .warning,
+.page .empty,
+.page .perf-badge {
+  animation: settle 0.5s var(--ease) both;
+}
+
+@keyframes settle {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* One easing curve for everything interactive */
+button,
+.studio-card,
+.summary-card,
+.chart-tab-btn,
+.top-nav button,
+.insight-item {
+  transition-timing-function: var(--ease);
+}
+
+.studio-card {
+  transition: --spot 0.45s ease, transform 0.5s var(--ease), box-shadow 0.5s var(--ease);
+}
+
+.studio-card:hover {
+  transform: translateY(-3px);
+}
+
+.primary,
+.login-form button,
+.studio-card button {
+  transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease), filter 0.35s var(--ease);
+}
+
+.primary:active:not(:disabled),
+.studio-card button:active {
+  transform: translateY(0) scale(0.985);
+}
+
+/* ── Type: lighter weights and looser tracking read cleaner on black ────── */
+
+.card h3,
+.studio-card h3 {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+
+.card h4,
+.chart-head h4 {
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.page-header {
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.page-header h2 {
+  font-size: clamp(24px, 2.5vw, 36px);
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+  max-width: 46ch;
+  text-wrap: balance;
+}
+
+.eyebrow {
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.hero-tagline {
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.summary-card span,
+.login-form label,
+.input-group label {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.summary-card strong {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-card small,
+.baseline-note {
+  font-weight: 600;
+}
+
+.primary,
+.login-form button,
+.studio-card button,
+.back-btn,
+.logout-btn,
+.download-btn {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.back-btn {
+  white-space: nowrap;
+  padding: 11px 18px;
+  font-size: 13px;
+}
+
+.feature-row strong,
+.preview-table td,
+.confusion-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.feature-row strong,
+.preview-table th,
+.notice strong,
+.result-box strong {
+  font-weight: 600;
+}
+
+.insight-item span {
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.card p,
+.insight-item p,
+.studio-card p {
+  font-size: 15.5px;
+}
+
+/* ── Form controls: no native chrome ────────────────────────────────────── */
+
+.input-group select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 42px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #c2c2c2 50%),
+    linear-gradient(135deg, #c2c2c2 50%, transparent 50%);
+  background-position:
+    calc(100% - 22px) 50%,
+    calc(100% - 16px) 50%;
+  background-size: 6px 6px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.input-group select option {
+  background: #0c0c0c;
+  color: var(--text);
+}
+
+.input-group input[type="file"] {
+  padding: 6px;
+  color: var(--soft);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.input-group input[type="file"]::file-selector-button {
+  margin-right: 14px;
+  padding: 6px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--edge);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.06));
+  color: #ffffff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.25s var(--ease), background 0.25s var(--ease);
+}
+
+.input-group input[type="file"]::file-selector-button:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.1));
+}
+
+/* The chosen file is already named inside the control */
+.input-group .file-name {
+  display: none;
+}
+
+.upload-card {
+  align-items: end;
+  gap: 20px;
+}
+
+/* ── Rhythm: one radius scale, a little more air ────────────────────────── */
+
+.card,
+.upload-card,
+.studio-card,
+.hero {
+  border-radius: 22px;
+}
+
+.summary-card,
+.chart-card,
+.empty,
+.empty-small {
+  border-radius: 16px;
+}
+
+.notice,
+.result-box,
+.warning,
+.insight-item,
+.finding,
+.table-wrapper {
+  border-radius: 14px;
+}
+
+.card,
+.upload-card {
+  padding: 28px;
+}
+
+.insight-item {
+  align-items: center;
+  border-color: var(--edge-soft);
+  background: rgba(255, 255, 255, 0.035);
+  transition: background 0.3s var(--ease), border-color 0.3s var(--ease);
+}
+
+.insight-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--edge);
+}
+
+.chart-tab-btn {
+  border-color: var(--edge-soft);
+  font-weight: 600;
+  transition: background 0.3s var(--ease), border-color 0.3s var(--ease), color 0.3s var(--ease),
+    box-shadow 0.3s var(--ease);
+}
+
+.chart-tab-btn.active {
+  border-color: var(--edge-bright);
+}
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────── */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+
+::selection {
+  background: rgba(255, 255, 255, 0.85);
+  color: #000000;
+}
+
+/* ── Motion preferences ─────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+  }
+}

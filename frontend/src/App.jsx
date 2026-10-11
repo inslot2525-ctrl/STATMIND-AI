@@ -19,7 +19,11 @@ import {
   Legend,
 } from "recharts";
 import "./App.css";
+import "./polish.css";
 import AuthScreen from "./AuthScreen";
+import AnalystPanel from "./AnalystPanel";
+import { installSpotlight } from "./spotlight";
+import { Leaderboard, LeakageReport, ModelReport } from "./MlResults";
 import {
   apiFetch,
   clearSession,
@@ -28,21 +32,305 @@ import {
   getToken,
   onUnauthorized,
   postForm,
+  postJson,
   runJob,
 } from "./api";
+
+// Shared presentational pieces. They live at module scope so their identity is
+// stable across renders; inputs rendered inside them keep focus while typing.
+function Card({ title, children }) {
+  return (
+    <div className="card">
+      <h3>{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function Empty({ title, text }) {
+  return (
+    <div className="empty">
+      <h3>{title}</h3>
+      <p>{text}</p>
+    </div>
+  );
+}
+
+function Summary({ label, value, small }) {
+  return (
+    <div className="summary-card">
+      <span>{label}</span>
+      <strong>{value ?? "N/A"}</strong>
+      {small && <small>{small}</small>}
+    </div>
+  );
+}
+
+function displayValue(value) {
+  if (Array.isArray(value)) return JSON.stringify(value);
+  if (value && typeof value === "object") return JSON.stringify(value);
+  if (value === null || value === undefined || value === "") return "N/A";
+  return String(value);
+}
+
+function MetricGrid({ metrics }) {
+  const entries = Object.entries(metrics || {});
+
+  if (!entries.length) {
+    return <div className="empty-small">No metrics available.</div>;
+  }
+
+  return (
+    <div className="summary-grid">
+      {entries.map(([key, value]) => (
+        <Summary
+          label={key.replaceAll("_", " ")}
+          value={displayValue(value)}
+          key={key}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PreviewTable({ rows }) {
+  if (!rows?.length) {
+    return <div className="empty-small">No preview rows returned.</div>;
+  }
+
+  const columns = Object.keys(rows[0] || {});
+
+  return (
+    <div className="table-wrapper">
+      <table className="preview-table">
+        <thead>
+          <tr>
+            {columns.map((column) => (
+              <th key={column}>{column}</th>
+            ))}
+          </tr>
+        </thead>
+
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={rowIndex}>
+              {columns.map((column) => (
+                <td key={column}>{displayValue(row[column])}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function InsightList({ items }) {
+  if (!items?.length) {
+    return <div className="empty-small">No insights available.</div>;
+  }
+
+  return (
+    <div className="insight-list">
+      {items.map((item, index) => (
+        <div className="insight-item" key={index}>
+          <span>{index + 1}</span>
+          <p>{item}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const pieColors = [
+  "#e5e5e5",
+  "#a3a3a3",
+  "#ffffff",
+  "#737373",
+  "#d4d4d4",
+  "#525252",
+  "#f5f5f5",
+  "#404040",
+];
+
+const tooltipProps = {
+  contentStyle: {
+    background: "#0a0a0a",
+    border: "1px solid rgba(255, 255, 255, 0.12)",
+    borderRadius: 12,
+    boxShadow: "0 12px 32px rgba(0, 0, 0, 0.6)",
+  },
+  labelStyle: { color: "#ffffff", fontWeight: 700 },
+  itemStyle: { color: "#f5efe0" },
+  cursor: { fill: "rgba(255, 255, 255, 0.04)" },
+};
+
+function Header({ title, subtitle, onBack }) {
+  return (
+    <div className="page-header">
+      <div>
+        <p className="eyebrow">{title}</p>
+        <h2>{subtitle}</h2>
+      </div>
+
+      <button className="back-btn" onClick={onBack}>
+        Back to Dashboard
+      </button>
+    </div>
+  );
+}
+
+const BarBlock = memo(function BarBlock({ chart, label = "Bar" }) {
+  const data = useMemo(() => chart.data, [chart.data]);
+  return (
+    <div className="chart-card">
+      <div className="chart-head">
+        <h4>{chart.title}</h4>
+        <span>{label}</span>
+      </div>
+      <ResponsiveContainer width="100%" height={280}>
+        <BarChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+          <XAxis dataKey={chart.x_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} interval={0} angle={data.length > 6 ? -20 : 0} dy={data.length > 6 ? 10 : 0} height={data.length > 6 ? 60 : 30} />
+          <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
+          <Tooltip {...tooltipProps} />
+          <Bar dataKey={chart.y_axis} radius={[8, 8, 0, 0]} fill="#e5e5e5" isAnimationActive={false} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});
+
+const LineBlock = memo(function LineBlock({ chart }) {
+  return (
+    <div className="chart-card">
+      <div className="chart-head">
+        <h4>{chart.title}</h4>
+        <span>Line</span>
+      </div>
+      <ResponsiveContainer width="100%" height={280}>
+        <LineChart data={chart.data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+          <XAxis dataKey={chart.x_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} />
+          <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
+          <Tooltip {...tooltipProps} />
+          <Line type="monotone" dataKey={chart.y_axis} stroke="#737373" strokeWidth={3} dot={false} isAnimationActive={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});
+
+const AreaBlock = memo(function AreaBlock({ chart }) {
+  return (
+    <div className="chart-card">
+      <div className="chart-head"><h4>{chart.title}</h4><span>Area</span></div>
+      <ResponsiveContainer width="100%" height={280}>
+        <AreaChart data={chart.data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+          <XAxis dataKey={chart.x_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} />
+          <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
+          <Tooltip {...tooltipProps} />
+          <Area type="monotone" dataKey={chart.y_axis} stroke="#e5e5e5" fill="#e5e5e5" fillOpacity={0.25} isAnimationActive={false} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});
+
+const PieBlock = memo(function PieBlock({ chart }) {
+  return (
+    <div className="chart-card">
+      <div className="chart-head"><h4>{chart.title}</h4><span>Pie</span></div>
+      <ResponsiveContainer width="100%" height={300}>
+        <PieChart>
+          <Pie data={chart.data} dataKey={chart.value_key} nameKey={chart.name_key} outerRadius={100} label isAnimationActive={false}>
+            {chart.data.map((_, index) => (<Cell key={index} fill={pieColors[index % pieColors.length]} />))}
+          </Pie>
+          <Tooltip {...tooltipProps} />
+          <Legend />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});
+
+const HistBlock = memo(function HistBlock({ chart }) {
+  return (
+    <div className="chart-card">
+      <div className="chart-head"><h4>{chart.title}</h4><span>Histogram</span></div>
+      <ResponsiveContainer width="100%" height={280}>
+        <BarChart data={chart.data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
+          <XAxis dataKey="range" tick={{ fontSize: 10, fill: "#a3a3a3" }} interval={0} angle={-15} dy={8} height={50} />
+          <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
+          <Tooltip {...tooltipProps} />
+          <Bar dataKey="count" radius={[8, 8, 0, 0]} fill="#a3a3a3" isAnimationActive={false} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});
+
+const ScatterBlock = memo(function ScatterBlock({ chart }) {
+  return (
+    <div className="chart-card">
+      <div className="chart-head"><h4>{chart.title}</h4><span>Scatter</span></div>
+      <ResponsiveContainer width="100%" height={280}>
+        <ScatterChart>
+          <CartesianGrid stroke="#262626" />
+          <XAxis type="number" dataKey={chart.x_axis} name={chart.x_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} />
+          <YAxis type="number" dataKey={chart.y_axis} name={chart.y_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} />
+          <Tooltip {...tooltipProps} cursor={{ stroke: "rgba(255, 255, 255, 0.25)", strokeDasharray: "3 3" }} />
+          <Scatter data={chart.data} fill="#22c55e" isAnimationActive={false} />
+        </ScatterChart>
+      </ResponsiveContainer>
+    </div>
+  );
+});
+
+const Heatmap = memo(function Heatmap({ result }) {
+  const heatmap = result?.charts?.correlation_heatmap;
+  if (!heatmap?.data?.length) return <div className="empty-small">Not enough numeric columns for correlation.</div>;
+  return (
+    <div className="chart-card full">
+      <div className="chart-head"><h4>{heatmap.title}</h4><span>Correlation • capped to 8 columns for speed</span></div>
+      <div className="heatmap-grid">
+        {heatmap.data.map((cell, index) => {
+          const intensity = Math.min(Math.abs(cell.value), 1);
+          const background = cell.value >= 0 ? `rgba(255, 255, 255, ${0.12 + intensity * 0.55})` : `rgba(224, 122, 45, ${0.12 + intensity * 0.55})`;
+          return (<div className="heatmap-cell" style={{ background }} key={index}><span>{cell.y} × {cell.x}</span><strong>{cell.value}</strong></div>);
+        })}
+      </div>
+    </div>
+  );
+});
 
 function App() {
   const [user, setUser] = useState(() => (getToken() ? getStoredUser() : null));
   const [authNotice, setAuthNotice] = useState("");
+
+  // Card borders light up under the pointer (see polish.css)
+  useEffect(() => installSpotlight(), []);
+  // null until the server says whether it wants a login (it does not in local development)
+  const [authRequired, setAuthRequired] = useState(null);
 
   useEffect(() => {
     onUnauthorized(() => {
       setUser(null);
       setAuthNotice("Your session has expired. Please log in again.");
     });
+
+    apiFetch("/api/auth/config")
+      .then(async (authConfig) => {
+        if (!authConfig.auth_required) setUser(await apiFetch("/api/auth/me"));
+        setAuthRequired(authConfig.auth_required);
+      })
+      .catch(() => setAuthRequired(true));
   }, []);
 
   const [currentPage, setCurrentPage] = useState("dashboard");
+  const goToDashboard = () => setCurrentPage("dashboard");
 
   const [file, setFile] = useState(null);
   const [domain, setDomain] = useState("business");
@@ -52,6 +340,9 @@ function App() {
   const [targetColumn, setTargetColumn] = useState("");
   const [algorithm, setAlgorithm] = useState("random_forest");
   const [testSize, setTestSize] = useState("0.2");
+  const [taskType, setTaskType] = useState("auto");
+  const [leakageResult, setLeakageResult] = useState(null);
+  const [leakageLoading, setLeakageLoading] = useState(false);
   const [mlResult, setMlResult] = useState(null);
   const [compareResult, setCompareResult] = useState(null);
   const [mlLoading, setMlLoading] = useState(false);
@@ -81,29 +372,6 @@ function App() {
   const [stageTarget, setStageTarget] = useState({});
   const [stageLoading, setStageLoading] = useState({});
 
-  const pieColors = [
-    "#e5e5e5",
-    "#a3a3a3",
-    "#ffffff",
-    "#737373",
-    "#d4d4d4",
-    "#525252",
-    "#f5f5f5",
-    "#404040",
-  ];
-
-  const tooltipProps = {
-    contentStyle: {
-      background: "#0a0a0a",
-      border: "1px solid rgba(255, 255, 255, 0.12)",
-      borderRadius: 12,
-      boxShadow: "0 12px 32px rgba(0, 0, 0, 0.6)",
-    },
-    labelStyle: { color: "#ffffff", fontWeight: 700 },
-    itemStyle: { color: "#f5efe0" },
-    cursor: { fill: "rgba(255, 255, 255, 0.04)" },
-  };
-
   const analyze = async () => {
     if (!file) {
       alert("Upload a CSV or Excel dataset first.");
@@ -127,6 +395,7 @@ function App() {
       setDatasetId(data.dataset_id || "");
       setTargetSuggestion(null);
       setTargetSuggestionError("");
+      setLeakageResult(null);
     } catch (error) {
       console.error("Frontend analysis error:", error);
       setFrontendError(error.message || "Analysis failed.");
@@ -141,6 +410,7 @@ function App() {
   const algorithmOptions = [
     ["random_forest", "Random Forest"],
     ["extra_trees", "Extra Trees"],
+    ["gradient_boosting", "Gradient Boosting"],
     ["decision_tree", "Decision Tree"],
     ["knn", "KNN"],
     ["svm", "SVM"],
@@ -172,6 +442,7 @@ function App() {
     formData.append("target_column", targetColumn);
     formData.append("test_size", String(numericTestSize));
     if (datasetId) formData.append("dataset_id", datasetId);
+    if (taskType !== "auto") formData.append("task_type", taskType);
 
     return formData;
   };
@@ -210,12 +481,59 @@ function App() {
       const data = await runJob("/api/compare-models", formData, setJobProgress);
 
       setCompareResult(data);
+      if (data.winner) {
+        setMlResult(data.winner);
+        setModelId(data.model_id || "");
+        setPredictionError("");
+      }
     } catch (error) {
       setMlError(error.message || "Model comparison failed.");
     } finally {
       setCompareLoading(false);
       setJobProgress(null);
     }
+  };
+
+  const checkLeakage = async () => {
+    setLeakageLoading(true);
+    setMlError("");
+
+    try {
+      if (!datasetFilename) {
+        throw new Error("Run Statistics Studio analysis first so the leakage check can use the uploaded dataset.");
+      }
+      if (!targetColumn) {
+        throw new Error("Choose a target column.");
+      }
+
+      const data = await postJson("/api/detect-leakage", {
+        filename: datasetFilename,
+        dataset_id: datasetId || null,
+        target_column: targetColumn,
+      });
+
+      setLeakageResult(data);
+    } catch (error) {
+      setMlError(error.message || "Leakage check failed.");
+    } finally {
+      setLeakageLoading(false);
+    }
+  };
+
+  // Everything computed so far, for the AI analyst and the report generator
+  const analystContext = {
+    dataset: result
+      ? { rows: result.rows, columns: result.columns, domain: result.domain, filename: datasetFilename }
+      : {},
+    schema: result?.schema || {},
+    statistics: result?.statistics || {},
+    domainInsights: result?.domain_insights || [],
+    targetAdvice: targetSuggestion || {},
+    mlResult: mlResult || {},
+    // The winner is already in mlResult
+    compareResult: compareResult ? { ...compareResult, winner: undefined } : {},
+    predictionResult: predictionResult || {},
+    leakageResult: leakageResult || {},
   };
 
   // ── MLOps data fetchers ──────────────────────────────────────────
@@ -286,7 +604,7 @@ function App() {
 
   const MLOpsStudio = () => (
     <section>
-      <Header title="MLOps Studio" subtitle="Experiments, model registry, and dataset lineage." />
+      <Header onBack={goToDashboard} title="MLOps Studio" subtitle="Experiments, model registry, and dataset lineage." />
 
       {/* Tab bar */}
       <div className="mlops-tabs">
@@ -612,7 +930,7 @@ function App() {
         <div className="studio-card">
           <div className="studio-tag">Machine Learning</div>
           <h3>ML Studio</h3>
-          <p>Train models after the analysis flow is stable.</p>
+          <p>Train a model or run cross-validated AutoML, with explanations and a leakage check.</p>
           <button onClick={() => setCurrentPage("ml")}>Open</button>
         </div>
 
@@ -629,12 +947,18 @@ function App() {
           <p>Track experiments, manage model registry, and view dataset lineage.</p>
           <button onClick={() => setCurrentPage("mlops")}>Open</button>
         </div>
+
+        <div className="studio-card">
+          <div className="studio-tag">Analyst</div>
+          <h3>AI Analyst</h3>
+          <p>Ask questions about your data and models, and export the full report.</p>
+          <button onClick={() => setCurrentPage("analyst")}>Open</button>
+        </div>
       </div>
     </section>
   );
 
-  const Statistics = () => {
-    const [chartTab, setChartTab] = useState("overview");
+  const [chartTab, setChartTab] = useState("overview");
     const chartCounts = useMemo(() => {
       if (!result?.charts) return { total: 0 };
       const c = result.charts;
@@ -654,9 +978,11 @@ function App() {
           (c.correlation_heatmap ? 1 : 0),
       };
     }, [result]);
+
+  const Statistics = () => {
     return (
       <section>
-        <Header title="Statistics Studio" subtitle="Profile datasets and generate visual intelligence — optimized for speed." />
+        <Header onBack={goToDashboard} title="Statistics Studio" subtitle="Profile datasets and generate visual intelligence — optimized for speed." />
 
         <div className="upload-card">
           <div className="input-group">
@@ -788,8 +1114,9 @@ function App() {
   const MLStudio = () => (
     <section>
       <Header
+        onBack={goToDashboard}
         title="ML Studio"
-        subtitle="Train models, compare algorithms, and save models for predictions."
+        subtitle="Train models, run cross-validated AutoML, and check for leakage."
       />
 
       {!result && (
@@ -940,6 +1267,15 @@ function App() {
               </div>
 
               <div className="input-group">
+                <label>Task Type</label>
+                <select value={taskType} onChange={(e) => setTaskType(e.target.value)}>
+                  <option value="auto">Auto-detect</option>
+                  <option value="classification">Classification</option>
+                  <option value="regression">Regression</option>
+                </select>
+              </div>
+
+              <div className="input-group">
                 <label>Test Size</label>
                 <input
                   type="number"
@@ -962,7 +1298,11 @@ function App() {
                 onClick={compareModels}
                 disabled={mlLoading || compareLoading}
               >
-                {compareLoading ? "Comparing..." : "Compare Models"}
+                {compareLoading ? "Running AutoML..." : "Run AutoML"}
+              </button>
+
+              <button className="primary" onClick={checkLeakage} disabled={leakageLoading}>
+                {leakageLoading ? "Checking..." : "Check Leakage"}
               </button>
             </div>
 
@@ -986,80 +1326,11 @@ function App() {
             </div>
           )}
 
-          {mlResult && (
-            <>
-              <div className="summary-grid">
-                <Summary label="Task Type" value={mlResult.task_type} />
-                <Summary label="Algorithm" value={mlResult.algorithm} />
-                <Summary label="Rows Used" value={mlResult.rows_used} />
-                <Summary label="Test Rows" value={mlResult.test_rows} />
-              </div>
+          {leakageResult && <LeakageReport result={leakageResult} />}
 
-              <Card title="Saved Model">
-                <div className="result-box">
-                  <span>Model ID</span>
-                  <strong>{mlResult.model_id}</strong>
-                </div>
-                <InsightList items={mlResult.model_explanation || []} />
-              </Card>
+          {compareResult && <Leaderboard result={compareResult} />}
 
-              <Card title="Model Metrics">
-                <MetricGrid metrics={mlResult.metrics} />
-              </Card>
-
-              {!!mlResult.feature_importance?.length && (
-                <Card title="Feature Importance">
-                  <FeatureList
-                    items={mlResult.feature_importance.map((item) => ({
-                      label: item.feature,
-                      value: item.importance,
-                    }))}
-                  />
-                </Card>
-              )}
-
-              <Card title="Training Details">
-                <FeatureList
-                  items={[
-                    { label: "Target", value: mlResult.target_column },
-                    { label: "Train Rows", value: mlResult.train_rows },
-                    { label: "Test Size", value: mlResult.test_size },
-                    {
-                      label: "Numeric Features",
-                      value: mlResult.numeric_features?.join(", ") || "None",
-                    },
-                    {
-                      label: "Categorical Features",
-                      value: mlResult.categorical_features?.join(", ") || "None",
-                    },
-                    {
-                      label: "Dropped Columns",
-                      value:
-                        mlResult.dropped_high_cardinality_columns?.join(", ") ||
-                        "None",
-                    },
-                  ]}
-                />
-              </Card>
-            </>
-          )}
-
-          {compareResult && (
-            <Card title="AutoML Compare">
-              <div className="summary-grid">
-                <Summary label="Best Model" value={compareResult.best_model} />
-                <Summary label="Task Type" value={compareResult.task_type} />
-                <Summary label="Metric" value={compareResult.ranking_metric} />
-                <Summary
-                  label="Rows Used"
-                  value={compareResult.rows_used_for_compare}
-                />
-              </div>
-
-              <Leaderboard rows={compareResult.leaderboard || []} />
-              <InsightList items={compareResult.warnings || []} />
-            </Card>
-          )}
+          {mlResult && <ModelReport result={mlResult} />}
         </>
       )}
     </section>
@@ -1068,6 +1339,7 @@ function App() {
   const PredictionStudio = () => (
     <section>
       <Header
+        onBack={goToDashboard}
         title="Prediction Studio"
         subtitle="Use saved models to generate predictions on test data."
       />
@@ -1176,297 +1448,6 @@ function App() {
     </section>
   );
 
-  function Header({ title, subtitle }) {
-    return (
-      <div className="page-header">
-        <div>
-          <p className="eyebrow">{title}</p>
-          <h2>{subtitle}</h2>
-        </div>
-
-        <button
-          className="back-btn"
-          onClick={() => setCurrentPage("dashboard")}
-        >
-          Back to Dashboard
-        </button>
-      </div>
-    );
-  }
-
-  function Card({ title, children }) {
-    return (
-      <div className="card">
-        <h3>{title}</h3>
-        {children}
-      </div>
-    );
-  }
-
-  function Empty({ title, text }) {
-    return (
-      <div className="empty">
-        <h3>{title}</h3>
-        <p>{text}</p>
-      </div>
-    );
-  }
-
-  function Summary({ label, value, small }) {
-    return (
-      <div className="summary-card">
-        <span>{label}</span>
-        <strong>{value ?? "N/A"}</strong>
-        {small && <small>{small}</small>}
-      </div>
-    );
-  }
-
-  function displayValue(value) {
-    if (Array.isArray(value)) return JSON.stringify(value);
-    if (value && typeof value === "object") return JSON.stringify(value);
-    if (value === null || value === undefined || value === "") return "N/A";
-    return String(value);
-  }
-
-  function MetricGrid({ metrics }) {
-    const entries = Object.entries(metrics || {});
-
-    if (!entries.length) {
-      return <div className="empty-small">No metrics available.</div>;
-    }
-
-    return (
-      <div className="summary-grid">
-        {entries.map(([key, value]) => (
-          <Summary
-            label={key.replaceAll("_", " ")}
-            value={displayValue(value)}
-            key={key}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  function FeatureList({ items }) {
-    if (!items?.length) {
-      return <div className="empty-small">No details available.</div>;
-    }
-
-    return (
-      <div className="feature-list">
-        {items.map((item, index) => (
-          <div className="feature-row" key={`${item.label}-${index}`}>
-            <span>{item.label}</span>
-            <strong>{displayValue(item.value)}</strong>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  function Leaderboard({ rows }) {
-    if (!rows?.length) {
-      return <div className="empty-small">No comparison results available.</div>;
-    }
-
-    return (
-      <div className="leaderboard">
-        <div className="leaderboard-head">
-          <span>Rank</span>
-          <span>Algorithm</span>
-          <span>Score</span>
-          <span>Metrics</span>
-        </div>
-
-        {rows.map((row, index) => (
-          <div className="leaderboard-row" key={`${row.algorithm}-${index}`}>
-            <span>#{index + 1}</span>
-            <code>{row.algorithm}</code>
-            <strong>{row.score ?? "Failed"}</strong>
-            <code>{row.error || JSON.stringify(row.metrics || {})}</code>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  function PreviewTable({ rows }) {
-    if (!rows?.length) {
-      return <div className="empty-small">No preview rows returned.</div>;
-    }
-
-    const columns = Object.keys(rows[0] || {});
-
-    return (
-      <div className="table-wrapper">
-        <table className="preview-table">
-          <thead>
-            <tr>
-              {columns.map((column) => (
-                <th key={column}>{column}</th>
-              ))}
-            </tr>
-          </thead>
-
-          <tbody>
-            {rows.map((row, rowIndex) => (
-              <tr key={rowIndex}>
-                {columns.map((column) => (
-                  <td key={column}>{displayValue(row[column])}</td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
-
-  function InsightList({ items }) {
-    if (!items?.length) {
-      return <div className="empty-small">No insights available.</div>;
-    }
-
-    return (
-      <div className="insight-list">
-        {items.map((item, index) => (
-          <div className="insight-item" key={index}>
-            <span>{index + 1}</span>
-            <p>{item}</p>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  const BarBlock = memo(function BarBlock({ chart, label = "Bar" }) {
-    const data = useMemo(() => chart.data, [chart.data]);
-    return (
-      <div className="chart-card">
-        <div className="chart-head">
-          <h4>{chart.title}</h4>
-          <span>{label}</span>
-        </div>
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-            <XAxis dataKey={chart.x_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} interval={0} angle={data.length > 6 ? -20 : 0} dy={data.length > 6 ? 10 : 0} height={data.length > 6 ? 60 : 30} />
-            <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
-            <Tooltip {...tooltipProps} />
-            <Bar dataKey={chart.y_axis} radius={[8, 8, 0, 0]} fill="#e5e5e5" isAnimationActive={false} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  });
-
-  const LineBlock = memo(function LineBlock({ chart }) {
-    return (
-      <div className="chart-card">
-        <div className="chart-head">
-          <h4>{chart.title}</h4>
-          <span>Line</span>
-        </div>
-        <ResponsiveContainer width="100%" height={280}>
-          <LineChart data={chart.data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-            <XAxis dataKey={chart.x_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} />
-            <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
-            <Tooltip {...tooltipProps} />
-            <Line type="monotone" dataKey={chart.y_axis} stroke="#737373" strokeWidth={3} dot={false} isAnimationActive={false} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  });
-
-  const AreaBlock = memo(function AreaBlock({ chart }) {
-    return (
-      <div className="chart-card">
-        <div className="chart-head"><h4>{chart.title}</h4><span>Area</span></div>
-        <ResponsiveContainer width="100%" height={280}>
-          <AreaChart data={chart.data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-            <XAxis dataKey={chart.x_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} />
-            <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
-            <Tooltip {...tooltipProps} />
-            <Area type="monotone" dataKey={chart.y_axis} stroke="#e5e5e5" fill="#e5e5e5" fillOpacity={0.25} isAnimationActive={false} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  });
-
-  const PieBlock = memo(function PieBlock({ chart }) {
-    return (
-      <div className="chart-card">
-        <div className="chart-head"><h4>{chart.title}</h4><span>Pie</span></div>
-        <ResponsiveContainer width="100%" height={300}>
-          <PieChart>
-            <Pie data={chart.data} dataKey={chart.value_key} nameKey={chart.name_key} outerRadius={100} label isAnimationActive={false}>
-              {chart.data.map((_, index) => (<Cell key={index} fill={pieColors[index % pieColors.length]} />))}
-            </Pie>
-            <Tooltip {...tooltipProps} />
-            <Legend />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  });
-
-  const HistBlock = memo(function HistBlock({ chart }) {
-    return (
-      <div className="chart-card">
-        <div className="chart-head"><h4>{chart.title}</h4><span>Histogram</span></div>
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={chart.data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#262626" />
-            <XAxis dataKey="range" tick={{ fontSize: 10, fill: "#a3a3a3" }} interval={0} angle={-15} dy={8} height={50} />
-            <YAxis tick={{ fontSize: 11, fill: "#a3a3a3" }} />
-            <Tooltip {...tooltipProps} />
-            <Bar dataKey="count" radius={[8, 8, 0, 0]} fill="#a3a3a3" isAnimationActive={false} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  });
-
-  const ScatterBlock = memo(function ScatterBlock({ chart }) {
-    return (
-      <div className="chart-card">
-        <div className="chart-head"><h4>{chart.title}</h4><span>Scatter</span></div>
-        <ResponsiveContainer width="100%" height={280}>
-          <ScatterChart>
-            <CartesianGrid stroke="#262626" />
-            <XAxis type="number" dataKey={chart.x_axis} name={chart.x_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} />
-            <YAxis type="number" dataKey={chart.y_axis} name={chart.y_axis} tick={{ fontSize: 11, fill: "#a3a3a3" }} />
-            <Tooltip {...tooltipProps} cursor={{ stroke: "rgba(255, 255, 255, 0.25)", strokeDasharray: "3 3" }} />
-            <Scatter data={chart.data} fill="#22c55e" isAnimationActive={false} />
-          </ScatterChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  });
-
-  const Heatmap = memo(function Heatmap({ result }) {
-    const heatmap = result?.charts?.correlation_heatmap;
-    if (!heatmap?.data?.length) return <div className="empty-small">Not enough numeric columns for correlation.</div>;
-    return (
-      <div className="chart-card full">
-        <div className="chart-head"><h4>{heatmap.title}</h4><span>Correlation • capped to 8 columns for speed</span></div>
-        <div className="heatmap-grid">
-          {heatmap.data.map((cell, index) => {
-            const intensity = Math.min(Math.abs(cell.value), 1);
-            const background = cell.value >= 0 ? `rgba(255, 255, 255, ${0.12 + intensity * 0.55})` : `rgba(224, 122, 45, ${0.12 + intensity * 0.55})`;
-            return (<div className="heatmap-cell" style={{ background }} key={index}><span>{cell.y} × {cell.x}</span><strong>{cell.value}</strong></div>);
-          })}
-        </div>
-      </div>
-    );
-  });
-
   const logout = () => {
     clearSession();
     setUser(null);
@@ -1475,12 +1456,15 @@ function App() {
     setMlResult(null);
     setCompareResult(null);
     setPredictionResult(null);
+    setLeakageResult(null);
     setDatasetId("");
     setModelId("");
     setCurrentPage("dashboard");
   };
 
   if (!user) {
+    if (authRequired !== true) return null; // still asking the server, or signing in as the local user
+
     return (
       <AuthScreen
         notice={authNotice}
@@ -1496,12 +1480,8 @@ function App() {
     <div className="shell">
       <header className="topbar">
         <div className="brand">
-          <div className="brand-icon">S</div>
-
-          <div>
-            <h1>STATMIND</h1>
-            <p>Data Intelligence OS</p>
-          </div>
+          <div className="brand-icon">StatMind</div>
+          <p>Data Intelligence OS</p>
         </div>
 
         <nav className="top-nav">
@@ -1511,6 +1491,7 @@ function App() {
             ["ml", "ML Studio"],
             ["prediction", "Prediction Studio"],
             ["mlops", "MLOps Studio"],
+            ["analyst", "AI Analyst"],
           ].map(([key, label]) => (
             <button
               key={key}
@@ -1528,18 +1509,28 @@ function App() {
           ))}
         </nav>
 
-        <div className="user-menu">
-          <span className="user-email" title={user.email}>{user.email}</span>
-          <button type="button" onClick={logout}>Log out</button>
-        </div>
+        {authRequired && (
+          <div className="user-menu">
+            <span className="user-email" title={user.email}>{user.email}</span>
+            <button type="button" onClick={logout}>Log out</button>
+          </div>
+        )}
       </header>
 
       <main className="main">
-        {currentPage === "dashboard" && <Dashboard />}
-        {currentPage === "statistics" && <Statistics />}
-        {currentPage === "ml" && <MLStudio />}
-        {currentPage === "prediction" && <PredictionStudio />}
-        {currentPage === "mlops" && <MLOpsStudio />}
+        {/* Keyed by page so each page fades in when you switch to it */}
+        <div className="page" key={currentPage}>
+          {currentPage === "dashboard" && Dashboard()}
+          {currentPage === "statistics" && Statistics()}
+          {currentPage === "ml" && MLStudio()}
+          {currentPage === "prediction" && PredictionStudio()}
+          {currentPage === "mlops" && MLOpsStudio()}
+        </div>
+        {/* Stays mounted so the conversation survives switching pages */}
+        <section className="page" hidden={currentPage !== "analyst"}>
+          <Header onBack={goToDashboard} title="AI Analyst" subtitle="Ask questions about your data and models." />
+          <AnalystPanel context={analystContext} hasDataset={!!result} />
+        </section>
       </main>
     </div>
   );

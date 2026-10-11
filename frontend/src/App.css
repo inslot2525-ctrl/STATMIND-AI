@@ -993,6 +993,267 @@ pre {
   font-size: 12px;
 }
 
+/* MODEL REPORT */
+
+.result-box span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.feature-row span {
+  flex: 0 0 auto;
+  max-width: 40%;
+}
+
+.baseline-note {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.card-footnote {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.note-list {
+  margin: 16px 0 0;
+  padding-left: 18px;
+  color: var(--soft);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.note-list li + li {
+  margin-top: 6px;
+}
+
+.preview-table.compact {
+  min-width: 560px;
+}
+
+.preview-table tr.winner td {
+  color: white;
+  font-weight: 800;
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.preview-table tr.baseline td {
+  color: var(--muted);
+}
+
+.row-tag {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--green);
+  color: var(--green);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.row-tag.muted {
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+.confusion-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 2px;
+}
+
+.confusion-table th,
+.confusion-table td {
+  padding: 12px 10px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--soft);
+  border-radius: 6px;
+}
+
+.confusion-table thead th:first-child,
+.confusion-table tbody th {
+  text-align: left;
+  white-space: nowrap;
+}
+
+.confusion-table td {
+  color: white;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.confusion-table td.diagonal {
+  outline: 1px solid rgba(255, 255, 255, 0.35);
+  outline-offset: -1px;
+}
+
+/* LEAKAGE */
+
+.finding-list {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.finding {
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.finding p {
+  margin: 8px 0 0;
+  color: var(--soft);
+  font-size: 14px;
+}
+
+.finding .finding-evidence {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.finding-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.finding-head strong {
+  color: white;
+  word-break: break-word;
+}
+
+.severity {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.severity.critical {
+  color: var(--danger);
+}
+
+.severity.high {
+  color: var(--orange);
+}
+
+.severity.medium {
+  color: var(--yellow);
+}
+
+/* AI ANALYST */
+
+.analyst-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+
+.analyst-mode {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.chat-log {
+  display: grid;
+  gap: 12px;
+  max-height: 520px;
+  overflow-y: auto;
+  margin: 8px 0 18px;
+}
+
+.chat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.chat-suggestions button {
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--soft);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chat-suggestions button:hover:not(:disabled) {
+  border-color: var(--soft);
+  color: white;
+}
+
+.chat-message {
+  max-width: 86%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.chat-message.user {
+  justify-self: end;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.chat-message p {
+  margin: 6px 0 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.chat-message .chat-note {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.chat-author {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.chat-form {
+  display: flex;
+  gap: 12px;
+}
+
+.chat-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--text);
+  font: inherit;
+}
+
+.chat-form input:focus {
+  outline: none;
+  border-color: var(--soft);
+}
+
 /* FEATURES */
 
 .feature-list {
