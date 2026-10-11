@@ -21,6 +21,7 @@ os.environ["JOB_BACKEND"] = "inline"  # jobs finish inside the request: determin
 os.environ["STORAGE_BACKEND"] = "local"
 os.environ["ANALYST_LLM"] = "off"  # never call the Anthropic API from tests
 os.environ.pop("MLFLOW_TRACKING_URI", None)  # MLflow tests point it at a temp store themselves
+os.environ.pop("LAKEFS_ENDPOINT", None)  # lakeFS tests run against a fake server
 os.environ.setdefault("MAX_UPLOAD_MB", "1")
 if os.getenv("TEST_DATABASE_URL"):
     os.environ["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]

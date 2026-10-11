@@ -336,6 +336,23 @@ function formatParams(params) {
   return entries.map(([name, value]) => `${name}=${value === null ? "None" : value}`).join(", ");
 }
 
+function CommitLine({ label, id, url }) {
+  if (!id) return null;
+
+  return (
+    <p className="commit-line">
+      {label}{" "}
+      {url ? (
+        <a className="text-link" href={url} target="_blank" rel="noreferrer">
+          <code>{id.slice(0, 12)}</code>
+        </a>
+      ) : (
+        <code>{id.slice(0, 12)}</code>
+      )}
+    </p>
+  );
+}
+
 export function ModelReport({ result }) {
   const diagnostics = result.diagnostics || {};
   const crossValidation = result.cross_validation;
@@ -384,6 +401,24 @@ export function ModelReport({ result }) {
                 Open this run in MLflow
               </a>
             )}
+          </div>
+        )}
+        {result.data_version && (
+          <div className="result-box">
+            <span>Data version (lakeFS)</span>
+            <strong>
+              {result.data_version.repository} @ {result.data_version.branch}
+            </strong>
+            <CommitLine
+              label="Trained on data commit"
+              id={result.data_version.dataset_commit}
+              url={result.data_version.dataset_commit_url}
+            />
+            <CommitLine
+              label="Model stored in commit"
+              id={result.data_version.model_commit}
+              url={result.data_version.model_commit_url}
+            />
           </div>
         )}
         <Notes items={result.model_explanation} />

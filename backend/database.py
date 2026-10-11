@@ -72,6 +72,7 @@ class Dataset(Base):
     duplicate_rows = Column(Integer, nullable=True)
     file_path = Column(String)  # legacy; use storage_key
     error = Column(Text, nullable=True)
+    data_commit = Column(String(64), nullable=True)  # lakeFS commit containing this file
 
 
 class Experiment(Base):

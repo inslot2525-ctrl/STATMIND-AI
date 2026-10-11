@@ -39,6 +39,24 @@ S3_REGION = _env("S3_REGION", "auto" if S3_ENDPOINT_URL else "us-east-1")
 S3_PREFIX = _env("S3_PREFIX", "")
 MAX_UPLOAD_MB = float(_env("MAX_UPLOAD_MB", "50"))
 
+# --- lakeFS (optional): version control for stored files -------------------
+# Set LAKEFS_ENDPOINT (for example http://127.0.0.1:8001) and files are stored
+# through lakeFS instead of STORAGE_BACKEND, with a commit per dataset and model.
+LAKEFS_ENDPOINT = _env("LAKEFS_ENDPOINT")
+LAKEFS_ACCESS_KEY_ID = _env("LAKEFS_ACCESS_KEY_ID")
+LAKEFS_SECRET_ACCESS_KEY = _env("LAKEFS_SECRET_ACCESS_KEY")
+LAKEFS_REPOSITORY = _env("LAKEFS_REPOSITORY", "statmind")
+LAKEFS_BRANCH = _env("LAKEFS_BRANCH", "main")
+# Where lakeFS keeps the bytes; only used when StatMind creates the repository
+LAKEFS_STORAGE_NAMESPACE = _env("LAKEFS_STORAGE_NAMESPACE", f"local://{LAKEFS_REPOSITORY}")
+# Where a browser reaches the lakeFS UI, for commit links
+LAKEFS_UI_URL = _env("LAKEFS_UI_URL", LAKEFS_ENDPOINT)
+
+if LAKEFS_ENDPOINT:
+    if not (LAKEFS_ACCESS_KEY_ID and LAKEFS_SECRET_ACCESS_KEY):
+        raise RuntimeError("LAKEFS_ACCESS_KEY_ID and LAKEFS_SECRET_ACCESS_KEY must be set with LAKEFS_ENDPOINT.")
+    STORAGE_BACKEND = "lakefs"
+
 # --- Database -------------------------------------------------------------
 DATABASE_URL = _env("DATABASE_URL", f"sqlite:///{os.path.join(DATA_DIR, 'statmind.db')}")
 # Railway/Heroku hand out postgres:// URLs; SQLAlchemy needs an explicit driver

@@ -14,6 +14,7 @@ logger = logging.getLogger("statmind")
 import config  # noqa: E402
 from database import init_db  # noqa: E402
 from services.auth import get_current_user  # noqa: E402
+from services import lakefs_versioning  # noqa: E402
 from services.storage import get_storage  # noqa: E402
 from routes.analysis_routes import router as analysis_router  # noqa: E402
 from routes.artifact_routes import router as artifact_router, public_router as artifact_public_router  # noqa: E402
@@ -28,6 +29,8 @@ from routes.target_routes import router as target_router  # noqa: E402
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
+    if lakefs_versioning.enabled():
+        lakefs_versioning.ensure_repository()  # fail fast: nothing can be stored without it
     get_storage()  # fail fast on bad storage configuration
     worker = None
     if config.JOB_BACKEND == "thread":

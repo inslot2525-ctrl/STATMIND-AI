@@ -860,6 +860,16 @@ button,
   transition: color 0.25s var(--ease), text-decoration-color 0.25s var(--ease);
 }
 
+.commit-line {
+  margin: 8px 0 0;
+  color: var(--soft);
+  font-size: 14px;
+}
+
+.commit-line .text-link {
+  margin-top: 0;
+}
+
 .text-link:hover {
   color: #ffffff;
   text-decoration-color: #ffffff;

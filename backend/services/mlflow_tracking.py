@@ -123,6 +123,13 @@ def log_training_run(
         if owner_id:
             tags["statmind.owner_id"] = str(owner_id)
 
+        # With lakeFS on: the exact data and model commits behind this run
+        data_version = result.get("data_version") or {}
+        if data_version.get("dataset_commit"):
+            tags["statmind.data_commit"] = data_version["dataset_commit"]
+        if data_version.get("model_commit"):
+            tags["statmind.model_commit"] = data_version["model_commit"]
+
         with mlflow.start_run(run_name=f"{result['algorithm']} / {result['target_column']}") as run:
             mlflow.set_tags(tags)
 

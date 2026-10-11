@@ -55,3 +55,7 @@ mlflow-data/
 mlruns/
 mlartifacts/
 mlflow.db
+
+# Local tools and lakeFS data
+.tools/
+lakefs-data/

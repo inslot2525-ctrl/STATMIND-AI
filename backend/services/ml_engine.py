@@ -13,7 +13,8 @@ from pandas.api.types import is_bool_dtype, is_datetime64_any_dtype, is_numeric_
 
 from services.file_reader import read_uploaded_file
 from services.experiment_tracker import log_experiment
-from services import mlflow_tracking
+from services import lakefs_versioning, mlflow_tracking
+from services.dataset_registry import get_dataset
 from services.model_registry import get_model_record, register_model
 from services.artifacts import create_artifact
 from services.storage import TMP_DIR, get_storage, make_key, safe_component
@@ -952,10 +953,32 @@ def _finalize_model(
     _report(progress, 92, "Saving and registering the model")
     model_id, model_key = save_trained_model(pipeline, metadata)
 
+    # ── MLOps: data lineage. The model file becomes a lakeFS commit, and the
+    # model records both that commit and the one holding its training data.
+    data_version = None
+    if lakefs_versioning.enabled():
+        dataset = get_dataset(dataset_id, owner_id) if dataset_id else None
+        model_commit = lakefs_versioning.commit(
+            f"Add model {model_id}",
+            {
+                "statmind.kind": "model",
+                "statmind.model_id": model_id,
+                "statmind.dataset_id": dataset_id,
+                "statmind.owner_id": owner_id,
+                "statmind.algorithm": algorithm,
+                "statmind.target": target_column,
+            },
+        )
+        data_version = lakefs_versioning.describe(
+            dataset_commit=(dataset or {}).get("data_commit"),
+            model_commit=model_commit,
+        )
+
     result = {
         "model_id": model_id,
         "experiment_id": None,
         "mlflow": None,
+        "data_version": data_version,
         "task_type": task_type,
         "algorithm": algorithm,
         "target_column": target_column,
@@ -1032,6 +1055,8 @@ def _finalize_model(
         full_metadata["dataset_id"] = dataset_id
     if result["mlflow"]:
         full_metadata["mlflow"] = result["mlflow"]
+    if data_version:
+        full_metadata["data_version"] = data_version
     register_model(model_id, full_metadata, owner_id=owner_id, storage_key=model_key)
 
     if dataset_id and owner_id:

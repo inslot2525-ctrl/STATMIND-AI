@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy.exc import IntegrityError
 
 from database import SessionLocal, Dataset
+from services import lakefs_versioning
 from services.file_reader import read_uploaded_file
 from services.storage import get_storage
 
@@ -33,6 +34,8 @@ def _to_dict(obj):
         "missing_cells": obj.missing_cells,
         "duplicate_rows": obj.duplicate_rows,
         "error": obj.error,
+        "data_commit": obj.data_commit,
+        "data_commit_url": lakefs_versioning.commit_url(obj.data_commit),
     }
 
 
@@ -58,8 +61,22 @@ def register_dataset(owner_id, stored_name, storage_key, local_path, original_fi
             rows = cols = missing_count = duplicate_rows = None
             error = str(e)
 
+        dataset_id = uuid.uuid4().hex
+
+        # With lakeFS on, the upload becomes a commit and the dataset remembers it
+        data_commit = lakefs_versioning.commit(
+            f"Add dataset {original_filename}",
+            {
+                "statmind.kind": "dataset",
+                "statmind.dataset_id": dataset_id,
+                "statmind.owner_id": owner_id,
+                "statmind.content_hash": file_hash,
+                "statmind.storage_key": storage_key,
+            },
+        )
+
         ds = Dataset(
-            id=uuid.uuid4().hex,
+            id=dataset_id,
             owner_id=owner_id,
             content_hash=file_hash,
             original_filename=original_filename,
@@ -72,6 +89,7 @@ def register_dataset(owner_id, stored_name, storage_key, local_path, original_fi
             duplicate_rows=duplicate_rows,
             file_path=storage_key,
             error=error,
+            data_commit=data_commit,
         )
         db.add(ds)
         try:

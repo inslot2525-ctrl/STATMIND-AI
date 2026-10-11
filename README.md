@@ -190,7 +190,9 @@ statmind-ai/
 │   └── services/
 │       ├── auth.py                 # Password hashing, JWT, current-user dependency
 │       ├── jobs.py, job_tasks.py   # Database-backed job queue and its tasks
-│       ├── storage.py              # Local / S3 storage, content-addressed uploads
+│       ├── storage.py              # Local / S3 / lakeFS storage, content-addressed uploads
+│       ├── lakefs_versioning.py    # lakeFS commits and data lineage (optional)
+│       ├── mlflow_tracking.py      # MLflow runs and model registry (optional)
 │       ├── artifacts.py            # Owned downloadable files
 │       ├── ml_engine.py            # Preprocessing, training, cross-validated AutoML, explainability, predictions
 │       ├── leakage_detector.py     # Leakage checks
@@ -304,6 +306,10 @@ Runs Postgres, the API, a separate job worker and the frontend, the same shape a
 | `MAX_UPLOAD_MB` | `50` | Maximum upload size. |
 | `ALLOWED_ORIGINS` | localhost dev ports | Comma-separated CORS origins. |
 | `ALLOWED_ORIGIN_REGEX` | `https://.*\.vercel\.app` | CORS origin regex; narrow it to your own Vercel project. |
+| `LAKEFS_ENDPOINT` | — | Set to a lakeFS server (for example `http://127.0.0.1:8001`) to store all files through lakeFS, with a commit per dataset and per model. Replaces `STORAGE_BACKEND`. |
+| `LAKEFS_ACCESS_KEY_ID` / `LAKEFS_SECRET_ACCESS_KEY` | — | lakeFS credentials. Required with `LAKEFS_ENDPOINT`. |
+| `LAKEFS_REPOSITORY` / `LAKEFS_BRANCH` | `statmind` / `main` | Repository (created on first start) and branch that files are written to. |
+| `LAKEFS_STORAGE_NAMESPACE` / `LAKEFS_UI_URL` | `local://<repository>` / the endpoint | Where lakeFS keeps the bytes when StatMind creates the repository (for example `s3://bucket/prefix`), and the address a browser uses for commit links. |
 | `MLFLOW_TRACKING_URI` | — | Set to an MLflow server (for example `http://127.0.0.1:5000`) to also log every trained model to MLflow. Unset: StatMind uses only its own experiment tables. |
 | `MLFLOW_EXPERIMENT` / `MLFLOW_UI_URL` | `statmind` / the tracking URI | MLflow experiment name, and the address a browser uses for "open in MLflow" links. |
 | `ANTHROPIC_API_KEY` | — | Enables the Claude-backed AI analyst. Without it the analyst uses built-in rules. Keep it in the environment, never in the repo. |
@@ -334,6 +340,46 @@ All endpoints except registration, login and health need an `Authorization: Bear
 | `GET`  | `/api/datasets`, `/api/models/`, `/api/experiments/` | Your registries |
 
 Full interactive docs at `/docs` (FastAPI Swagger UI; use **Authorize** to log in).
+
+### One command for the local MLOps stack (Windows)
+
+```powershell
+.\start-dev.ps1          # lakeFS + MLflow + API + app, each in its own window
+.\start-dev.ps1 -Plain   # just the API and the app
+```
+
+lakeFS is started only if its binary is at `.tools\lakefs\lakefs.exe`
+(download the Windows zip from the [lakeFS releases](https://github.com/treeverse/lakeFS/releases)
+and unpack it there). Its credentials are generated on first run into
+`lakefs-data\credentials.json`, which is git-ignored.
+
+### lakeFS: version control for data and models (optional)
+
+[lakeFS](https://lakefs.io/) gives the stored files Git-style commits. With `LAKEFS_ENDPOINT` set:
+
+- Every file goes through lakeFS's S3 gateway to one branch of one repository.
+- **Each dataset upload is a commit**, and the dataset records its commit id.
+- **Each trained model is a commit**, and the model records two ids: the commit holding the data
+  it was trained on, and the commit holding the model file. Both are shown in the model report,
+  stored in the model registry, and added to the MLflow run as tags.
+- Any dataset can be read back exactly as it was at a commit:
+  `s3://<repository>/<commit id>/uploads/<file>`.
+
+Committing is best effort: if lakeFS rejects a commit the file is still stored and training still
+succeeds, and the commit id is simply missing. Startup is strict, because without a reachable
+repository nothing can be stored.
+
+Switching an existing installation over? Files uploaded before are still on local disk. Copy them in
+and commit them with:
+
+```bash
+cd backend
+python manage.py import-local-files   # with the LAKEFS_* variables set
+```
+
+Not covered yet: branching per experiment, and merging or reverting from the StatMind UI (use the
+lakeFS UI or `lakectl`). Prediction CSVs and reports are stored through lakeFS but only committed
+along with the next dataset or model.
 
 ### MLflow (optional)
 
@@ -392,6 +438,7 @@ an MLflow service and wires it up automatically.
 - [scikit-learn](https://scikit-learn.org/) — ML algorithms, cross-validation, tuning, permutation importance
 - [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python) — Claude-backed AI analyst (optional)
 - [MLflow](https://mlflow.org/) — experiment tracking and model registry (optional)
+- [lakeFS](https://lakefs.io/) — version control for datasets and models (optional)
 - [pandas](https://pandas.pydata.org/) — data manipulation
 - [numpy](https://numpy.org/) — numerical computing
 - [uvicorn](https://www.uvicorn.org/) — ASGI server
@@ -412,6 +459,7 @@ an MLflow service and wires it up automatically.
 - [x] Model-agnostic explainability (permutation importance, ROC, confusion matrix)
 - [x] LLM-backed AI analyst
 - [x] MLflow experiment tracking and model registry
+- [x] lakeFS data versioning with dataset-to-model lineage
 - [ ] OAuth login (Google / GitHub) and password reset
 - [ ] Time series forecasting module
 - [ ] NLP / text column analysis
