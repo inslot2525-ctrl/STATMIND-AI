@@ -27,6 +27,12 @@ def _token_response(user: User) -> dict:
     }
 
 
+@router.get("/config")
+def auth_config():
+    """Tells the frontend whether to show the login screen."""
+    return {"auth_required": config.AUTH_REQUIRED}
+
+
 @router.post("/register", status_code=201)
 def register(body: RegisterRequest):
     if not config.ALLOW_REGISTRATION:
@@ -41,7 +47,9 @@ def register(body: RegisterRequest):
 # OAuth2 password form (fields: username, password) so Swagger's "Authorize" works too
 @router.post("/login")
 def login(form: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate(form.username, form.password)
+    # The built-in local user has no password and is never a login target
+    is_local = form.username.strip().lower() == config.LOCAL_USER_EMAIL
+    user = None if is_local else authenticate(form.username, form.password)
     if user is None:
         raise HTTPException(
             status_code=401,

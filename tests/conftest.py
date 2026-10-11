@@ -19,6 +19,7 @@ os.environ["STATMIND_ENV"] = "test"
 os.environ["JWT_SECRET"] = "test-secret-" + uuid.uuid4().hex
 os.environ["JOB_BACKEND"] = "inline"  # jobs finish inside the request: deterministic tests
 os.environ["STORAGE_BACKEND"] = "local"
+os.environ["ANALYST_LLM"] = "off"  # never call the Anthropic API from tests
 os.environ.setdefault("MAX_UPLOAD_MB", "1")
 if os.getenv("TEST_DATABASE_URL"):
     os.environ["DATABASE_URL"] = os.environ["TEST_DATABASE_URL"]

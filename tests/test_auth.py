@@ -7,6 +7,7 @@ import pytest
 PUBLIC_PATHS = {
     "/", "/api/health",
     "/api/auth/register", "/api/auth/login",
+    "/api/auth/config",  # only says whether a login is needed
     "/api/artifacts/download",  # authorised by a signed token in the URL
 }
 

@@ -47,3 +47,5 @@ backend/statmind.db-journal
 .dvcstore/
 .dvc/tmp/
 
+*.db-shm
+*.db-wal

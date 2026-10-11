@@ -53,6 +53,13 @@ JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_MINUTES = _env_int("ACCESS_TOKEN_MINUTES", 60 * 12)
 DOWNLOAD_LINK_SECONDS = _env_int("DOWNLOAD_LINK_SECONDS", 300)
 ALLOW_REGISTRATION = _env_bool("ALLOW_REGISTRATION", True)
+# Local development runs without a login screen: requests with no token act as
+# one built-in local user. Set AUTH_REQUIRED=true to bring the login back.
+AUTH_REQUIRED = _env_bool("AUTH_REQUIRED", ENVIRONMENT != "development")
+LOCAL_USER_EMAIL = "local@statmind.local"
+
+if IS_PRODUCTION and not AUTH_REQUIRED:
+    raise RuntimeError("AUTH_REQUIRED cannot be false when STATMIND_ENV=production.")
 
 if not JWT_SECRET:
     if IS_PRODUCTION:
@@ -68,3 +75,12 @@ JOB_BACKEND = _env("JOB_BACKEND", "thread")
 JOB_POLL_SECONDS = float(_env("JOB_POLL_SECONDS", "1"))
 JOB_STALE_SECONDS = _env_int("JOB_STALE_SECONDS", 120)
 JOB_MAX_ATTEMPTS = _env_int("JOB_MAX_ATTEMPTS", 3)
+
+# --- AI analyst -----------------------------------------------------------
+# auto : answer with Claude when Anthropic credentials are configured, else with built-in rules
+# off  : always use the built-in rules
+ANALYST_LLM = _env("ANALYST_LLM", "auto")
+ANALYST_MODEL = _env("ANALYST_MODEL", "claude-opus-5-5")
+ANALYST_LLM_ENABLED = ANALYST_LLM != "off" and bool(
+    _env("ANTHROPIC_API_KEY") or _env("ANTHROPIC_AUTH_TOKEN")
+)

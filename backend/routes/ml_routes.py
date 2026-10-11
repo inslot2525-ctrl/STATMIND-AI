@@ -4,6 +4,7 @@ from database import User
 from routes.deps import resolve_user_dataset
 from services.auth import get_current_user
 from services.jobs import enqueue
+from services.ml_engine import TASK_TYPES
 
 router = APIRouter()
 
@@ -11,6 +12,16 @@ router = APIRouter()
 def _check_test_size(test_size: float):
     if not 0 < test_size < 1:
         raise HTTPException(status_code=400, detail="test_size must be between 0 and 1. Example: 0.2")
+
+
+def _check_task_type(task_type: str | None) -> str | None:
+    """Empty or 'auto' means: detect classification vs regression from the target."""
+    task_type = (task_type or "").lower().strip()
+    if task_type in ("", "auto"):
+        return None
+    if task_type not in TASK_TYPES:
+        raise HTTPException(status_code=400, detail=f"task_type must be auto or one of {list(TASK_TYPES)}.")
+    return task_type
 
 
 # Training runs as a background job: these endpoints return 202 with a job id
@@ -22,9 +33,11 @@ def train_model(
     target_column: str = Form(...),
     algorithm: str = Form(...),
     test_size: float = Form(0.2),
+    task_type: str = Form(None),
     user: User = Depends(get_current_user),
 ):
     _check_test_size(test_size)
+    task_type = _check_task_type(task_type)
     dataset = resolve_user_dataset(user.id, dataset_id, filename)
     return enqueue(
         "train_model",
@@ -33,6 +46,7 @@ def train_model(
             "target_column": target_column,
             "algorithm": algorithm,
             "test_size": test_size,
+            "task_type": task_type,
         },
         owner_id=user.id,
     )
@@ -44,13 +58,20 @@ def compare_models(
     dataset_id: str = Form(None),
     target_column: str = Form(...),
     test_size: float = Form(0.2),
+    task_type: str = Form(None),
     user: User = Depends(get_current_user),
 ):
     _check_test_size(test_size)
+    task_type = _check_task_type(task_type)
     dataset = resolve_user_dataset(user.id, dataset_id, filename)
     return enqueue(
         "compare_models",
-        {"dataset_id": dataset["id"], "target_column": target_column, "test_size": test_size},
+        {
+            "dataset_id": dataset["id"],
+            "target_column": target_column,
+            "test_size": test_size,
+            "task_type": task_type,
+        },
         owner_id=user.id,
     )
 

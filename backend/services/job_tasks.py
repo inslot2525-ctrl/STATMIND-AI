@@ -22,6 +22,7 @@ def train_model_task(params: dict, owner_id: str, progress) -> dict:
         test_size=params["test_size"],
         dataset_id=params["dataset_id"],
         owner_id=owner_id,
+        task_type=params.get("task_type"),
         progress=progress,
     )
 
@@ -32,6 +33,8 @@ def compare_models_task(params: dict, owner_id: str, progress) -> dict:
         target_column=params["target_column"],
         test_size=params["test_size"],
         dataset_id=params["dataset_id"],
+        owner_id=owner_id,
+        task_type=params.get("task_type"),
         progress=progress,
     )
 

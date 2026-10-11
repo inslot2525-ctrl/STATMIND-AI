@@ -15,7 +15,8 @@ import config
 from database import SessionLocal, User, utcnow
 
 password_hasher = PasswordHash.recommended()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+# auto_error=False: a missing token is handled in get_current_user, which may allow it
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login", auto_error=False)
 
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MIN_PASSWORD_LENGTH = 8
@@ -117,18 +118,48 @@ _CREDENTIALS_ERROR = HTTPException(
 )
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
-    try:
-        payload = _decode(token, "access")
-    except jwt.PyJWTError:
-        raise _CREDENTIALS_ERROR
-
+def get_local_user() -> User:
+    """The single built-in user that owns everything when login is switched off."""
     db = SessionLocal()
     try:
-        user = db.get(User, payload.get("sub"))
+        user = db.query(User).filter_by(email=config.LOCAL_USER_EMAIL).first()
+        if user is None:
+            user = User(
+                id=uuid.uuid4().hex,
+                email=config.LOCAL_USER_EMAIL,
+                # Not a valid hash, so nobody can log in as this user with a password
+                password_hash="!",
+                is_admin=False,
+                created_at=utcnow(),
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        return user
     finally:
         db.close()
 
-    if user is None:
-        raise _CREDENTIALS_ERROR
-    return user
+
+def _user_from_token(token: str | None) -> User | None:
+    if not token:
+        return None
+    try:
+        payload = _decode(token, "access")
+    except jwt.PyJWTError:
+        return None
+
+    db = SessionLocal()
+    try:
+        return db.get(User, payload.get("sub"))
+    finally:
+        db.close()
+
+
+def get_current_user(token: str | None = Depends(oauth2_scheme)) -> User:
+    user = _user_from_token(token)
+
+    if user is not None:
+        return user
+    if not config.AUTH_REQUIRED:
+        return get_local_user()
+    raise _CREDENTIALS_ERROR

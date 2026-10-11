@@ -24,7 +24,7 @@
 
 ## 🧠 What is StatMind AI?
 
-StatMind AI is a **full-stack data intelligence platform** that takes your raw CSV or Excel file and turns it into statistics, machine learning models, predictions, leakage reports, and AI-generated insights — all in one workspace.
+StatMind AI is a **full-stack AutoML platform** that takes your raw CSV or Excel file and turns it into statistics, cross-validated machine learning models, predictions, leakage reports, and AI-generated insights — all in one workspace.
 
 No Jupyter notebooks. No messy scripts. No PhD required (we handle that part).
 
@@ -68,6 +68,7 @@ Train real machine learning models with zero setup:
 |---|---|
 | Random Forest | Classification / Regression |
 | Extra Trees | Classification / Regression |
+| Gradient Boosting (histogram-based) | Classification / Regression |
 | Decision Tree | Classification / Regression |
 | K-Nearest Neighbors | Classification / Regression |
 | Support Vector Machine | Classification / Regression |
@@ -77,18 +78,43 @@ Train real machine learning models with zero setup:
 | Lasso Regression | Regression |
 
 Every trained model gives you:
-- Accuracy / F1 / Precision / Recall / R² / MAE / RMSE (whatever applies)
-- Feature importance rankings
-- Auto-detected task type (classification vs regression)
-- Human-readable model explanation bullets
+- Accuracy, balanced accuracy, macro and weighted F1, precision, recall and ROC AUC, or R² / MAE / RMSE
+- The same metrics for a **baseline that ignores the features**, so every score has a reference point
+- **Permutation feature importance** with error bars, for every algorithm, reported per input column
+- ROC curves, a labelled confusion matrix and per-class scores, or a predicted-vs-actual plot
+- Auto-detected task type (classification vs regression), which you can override
+- Class reweighting and a warning when the target is imbalanced
 - A **saved model ID** you can reuse forever
+
+Preprocessing is part of the saved pipeline: median / most-frequent imputation, scaling, one-hot
+encoding with rare categories grouped, and date columns expanded into year, month, day of week and
+elapsed days. ID-like columns are dropped.
 
 ---
 
 ### 🏆 AutoML Compare
 Can't pick an algorithm? Don't.
 
-Run **Compare Models** and StatMind trains every compatible algorithm on your data simultaneously, ranks them on a leaderboard, and crowns the winner.
+Run **AutoML** and StatMind:
+
+1. Sets the test split aside before anything else touches it.
+2. Ranks every compatible algorithm by **5-fold cross-validation** on the training split
+   (macro F1 for classification, R² for regression), reporting mean ± standard deviation.
+3. **Tunes the top two** with a random hyperparameter search on the same folds.
+4. Refits the winner on the whole training split and scores it **once** on the held-out test split.
+5. Saves and registers the winner, so it is ready in Prediction Studio and the model registry.
+
+The leaderboard always includes a feature-blind baseline row. On more than 5,000 training rows SVM
+and KNN are skipped, and above 20,000 the cross-validation round uses a 20,000-row sample; the
+winner is still refit on all training rows.
+
+Results on the bundled benchmark datasets (`tests/data`, 80/20 split, seed 42):
+
+| Dataset | Task | Winner | 5-fold CV | Held-out test | Baseline |
+|---|---|---|---|---|---|
+| Iris | 3-class | SVM (tuned) | F1 0.975 ± 0.021 | accuracy 0.967 | accuracy 0.333 |
+| Breast cancer | binary | Logistic regression (tuned) | F1 0.981 ± 0.006 | accuracy 0.974, AUC 0.996 | accuracy 0.632 |
+| Diabetes | regression | Lasso (tuned) | R² 0.481 ± 0.040 | R² 0.456, RMSE 53.7 | RMSE 73.2 |
 
 > *It's like a tournament bracket, but for algorithms.*
 
@@ -107,17 +133,26 @@ Load any saved model ID + a new test dataset and generate predictions instantly.
 ### 🕵️ Leakage Detector
 The feature that could save your entire ML project from being a lie.
 
-StatMind analyzes your dataset for **data leakage** — columns that are suspiciously correlated with your target in ways that would never exist in production. It flags them before you waste 3 days wondering why your model has 99.8% accuracy and fails in the real world.
+StatMind analyzes your dataset for **data leakage** — columns that give the answer away in ways that would never exist in production. It flags them before you waste 3 days wondering why your model has 99.8% accuracy and fails in the real world.
+
+- **Single-feature predictive power**: a shallow tree is cross-validated on each feature alone; a feature that nearly predicts the target by itself is flagged. This covers categorical and non-linear leaks that correlation misses.
+- Exact copies of the target, and near-perfect correlation for numeric and binary targets
+- Targets that are arithmetic combinations of two columns (`profit = revenue - expense`)
+- ID-like columns and outcome-like column names (matched by whole word, so `paid` is not an `id`)
+
+These are heuristics that point at columns to review; they are not proof either way.
 
 > *"My model gets 100% accuracy" — you, before using this feature.*
 
 ---
 
 ### 💬 AI Data Scientist Chatbot
-An embedded analyst that knows your dataset context and answers questions like:
-- "What's the most important feature for predicting churn?"
-- "Why does this column have so many nulls?"
-- "Should I normalize this data?"
+An embedded analyst that answers from the results StatMind has computed for your dataset — metrics, baseline, cross-validation scores, feature importance, the AutoML leaderboard and leakage findings:
+- "Can I trust this model's score?"
+- "Which features matter most, and why?"
+- "What should I do next to improve the model?"
+
+With `ANTHROPIC_API_KEY` set it is answered by Claude. Without a key, or if the call fails, built-in keyword rules answer instead, and the chat shows which one replied.
 
 ---
 
@@ -157,13 +192,17 @@ statmind-ai/
 │       ├── jobs.py, job_tasks.py   # Database-backed job queue and its tasks
 │       ├── storage.py              # Local / S3 storage, content-addressed uploads
 │       ├── artifacts.py            # Owned downloadable files
-│       ├── ml_engine.py            # Model training, AutoML, predictions
+│       ├── ml_engine.py            # Preprocessing, training, cross-validated AutoML, explainability, predictions
+│       ├── leakage_detector.py     # Leakage checks
+│       ├── ai_analyst.py           # Claude-backed analyst with a rule-based fallback
 │       ├── dataset_registry.py, experiment_tracker.py, model_registry.py
 │       └── ...                     # Statistics, charts, leakage, target advisor, reports
 │
 └── frontend/                 # React + Vite frontend
     └── src/
-        ├── App.jsx           # All studios
+        ├── App.jsx           # Studios and app state
+        ├── MlResults.jsx     # Model report, AutoML leaderboard, leakage report
+        ├── AnalystPanel.jsx  # AI analyst chat and report export
         ├── AuthScreen.jsx    # Login / registration
         ├── api.js            # API client: tokens, job polling, downloads
         └── App.css           # Dark glassmorphism design system
@@ -181,8 +220,8 @@ statmind-ai/
 ### 1. Clone it
 
 ```bash
-git clone https://github.com/yourname/statmind-ai.git
-cd statmind-ai
+git clone https://github.com/inslot2525-ctrl/STATMIND-AI.git
+cd STATMIND-AI
 ```
 
 ### 2. Backend setup
@@ -209,8 +248,10 @@ Backend runs at → `http://localhost:8000`
 API docs → `http://localhost:8000/docs`
 
 Locally this needs no extra services: SQLite, files on disk, and background jobs
-run in a worker thread inside the API. Open the app and create an account; every
-dataset, model and experiment is private to its owner.
+run in a worker thread inside the API. In local development there is no login
+screen: everything belongs to one built-in local user. Set `AUTH_REQUIRED=true` to
+turn accounts on, after which every dataset, model and experiment is private to its
+owner. Production (`STATMIND_ENV=production`) always requires login.
 
 Upgrading from a version without accounts? Your old datasets and models are kept
 but have no owner yet. Create your account, then give them to it:
@@ -252,6 +293,7 @@ Runs Postgres, the API, a separate job worker and the frontend, the same shape a
 | `STATMIND_ENV` | `development` | Set to `production` to refuse to start without `JWT_SECRET`. |
 | `JWT_SECRET` | random per start | Signs login tokens and download links. **Required in production** (32+ random characters). |
 | `ACCESS_TOKEN_MINUTES` | `720` | How long a login lasts. |
+| `AUTH_REQUIRED` | `false` in development, `true` otherwise | `false` skips the login screen and runs as one local user. Cannot be `false` in production. |
 | `ALLOW_REGISTRATION` | `true` | Set `false` to allow only accounts created with `manage.py create-user`. |
 | `DATABASE_URL` | SQLite in `STATMIND_DATA_DIR` | Any SQLAlchemy URL. `postgres://...` URLs (Railway, Heroku) are accepted as-is. Schema migrations run automatically on startup. |
 | `STORAGE_BACKEND` | `local` | `local` (files under `STATMIND_DATA_DIR`) or `s3` (AWS S3, Cloudflare R2, MinIO). |
@@ -262,6 +304,8 @@ Runs Postgres, the API, a separate job worker and the frontend, the same shape a
 | `MAX_UPLOAD_MB` | `50` | Maximum upload size. |
 | `ALLOWED_ORIGINS` | localhost dev ports | Comma-separated CORS origins. |
 | `ALLOWED_ORIGIN_REGEX` | `https://.*\.vercel\.app` | CORS origin regex; narrow it to your own Vercel project. |
+| `ANTHROPIC_API_KEY` | — | Enables the Claude-backed AI analyst. Without it the analyst uses built-in rules. Keep it in the environment, never in the repo. |
+| `ANALYST_MODEL` / `ANALYST_LLM` | `claude-opus-5-5` / `auto` | Model used by the analyst; set `ANALYST_LLM=off` to force the built-in rules. |
 | `LOG_LEVEL` | `INFO` | Backend log level. |
 
 ---
@@ -277,8 +321,8 @@ All endpoints except registration, login and health need an `Authorization: Bear
 | `GET`  | `/api/auth/me` | The current user |
 | `POST` | `/api/analyze` | Upload & profile a dataset |
 | `POST` | `/api/recommend-target` | AI target variable suggestion |
-| `POST` | `/api/train-model` | Start a training job → `202` + job |
-| `POST` | `/api/compare-models` | Start an AutoML leaderboard job → `202` + job |
+| `POST` | `/api/train-model` | Start a training job → `202` + job. Optional `task_type` (`auto`, `classification`, `regression`) |
+| `POST` | `/api/compare-models` | Start an AutoML job (cross-validate, tune, save the winner) → `202` + job |
 | `GET`  | `/api/jobs/{id}` | Job status, progress, and result when finished |
 | `POST` | `/api/predict-test-data` | Run predictions with a saved model |
 | `GET`  | `/api/artifacts/{id}/download-url` | Short-lived link to download a prediction CSV or report |
@@ -316,7 +360,8 @@ Full interactive docs at `/docs` (FastAPI Swagger UI; use **Authorize** to log i
 - [SQLAlchemy](https://www.sqlalchemy.org/) + [Alembic](https://alembic.sqlalchemy.org/) — SQLite / PostgreSQL with migrations
 - [PyJWT](https://pyjwt.readthedocs.io/) + argon2 ([pwdlib](https://frankie567.github.io/pwdlib/)) — accounts and tokens
 - [boto3](https://boto3.amazonaws.com/) — S3 / R2 / MinIO storage
-- [scikit-learn](https://scikit-learn.org/) — ML algorithms
+- [scikit-learn](https://scikit-learn.org/) — ML algorithms, cross-validation, tuning, permutation importance
+- [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python) — Claude-backed AI analyst (optional)
 - [pandas](https://pandas.pydata.org/) — data manipulation
 - [numpy](https://numpy.org/) — numerical computing
 - [uvicorn](https://www.uvicorn.org/) — ASGI server
@@ -333,10 +378,14 @@ Full interactive docs at `/docs` (FastAPI Swagger UI; use **Authorize** to log i
 
 - [x] User accounts (JWT) with per-user data isolation
 - [x] PostgreSQL + migrations, S3/R2 storage, background jobs
+- [x] Cross-validated AutoML with tuning, baselines and a saved winner
+- [x] Model-agnostic explainability (permutation importance, ROC, confusion matrix)
+- [x] LLM-backed AI analyst
 - [ ] OAuth login (Google / GitHub) and password reset
 - [ ] Time series forecasting module
 - [ ] NLP / text column analysis
-- [ ] Model explainability (SHAP values)
+- [ ] Per-prediction explanations (SHAP values)
+- [ ] Model serving endpoint and drift monitoring
 - [ ] Multi-file join and merge studio
 - [ ] Export to Jupyter Notebook
 - [ ] Deploy to cloud (Docker + Railway / Render)

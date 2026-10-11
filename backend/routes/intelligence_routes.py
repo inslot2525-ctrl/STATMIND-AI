@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -17,6 +17,8 @@ router = APIRouter()
 class AnalystChatRequest(BaseModel):
     question: str
     context: Dict[str, Any]
+    # Earlier turns of this chat: [{"role": "user" | "assistant", "content": "..."}]
+    history: List[Dict[str, Any]] = []
 
 
 class ReportRequest(BaseModel):
@@ -35,6 +37,7 @@ def chat_analyst(request: AnalystChatRequest, user: User = Depends(get_current_u
         return answer_data_scientist_question(
             question=request.question,
             context=request.context,
+            history=request.history,
         )
 
     except ValueError as e:

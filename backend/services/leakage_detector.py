@@ -1,8 +1,14 @@
 import itertools
+import re
+
 import pandas as pd
 import numpy as np
+from pandas.api.types import is_bool_dtype, is_numeric_dtype
+from sklearn.model_selection import cross_val_score
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 
 from services.file_reader import read_uploaded_file
+from services.ml_engine import detect_datetime_columns, detect_task_type
 
 
 BAD_FEATURE_KEYWORDS = [
@@ -34,6 +40,23 @@ LEAKAGE_KEYWORDS = [
 ]
 
 
+# Single-feature check: a feature that alone predicts the target this well is suspicious
+SOLO_SCORE_THRESHOLD = 0.97
+SOLO_MAX_ROWS = 5000
+SOLO_MAX_FEATURES = 60
+
+# Arithmetic check: only the columns most correlated with the target are paired up
+ARITHMETIC_MAX_COLUMNS = 9
+
+SEVERITY_POINTS = {"Critical": 40, "High": 25, "Medium": 10}
+
+
+def _name_tokens(column_name: str) -> set:
+    """Words in a column name: 'customerID' and 'customer_id' both give {'customer', 'id'}."""
+    spaced = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", str(column_name))
+    return {token for token in re.split(r"[^a-z0-9]+", spaced.lower()) if token}
+
+
 def _safe_corr(a: pd.Series, b: pd.Series):
     try:
         a_numeric = pd.to_numeric(a, errors="coerce")
@@ -56,14 +79,13 @@ def _safe_corr(a: pd.Series, b: pd.Series):
 
 
 def _is_identifier_like(column_name: str, series: pd.Series):
-    col_lower = str(column_name).lower().strip()
-
-    if any(keyword in col_lower for keyword in BAD_FEATURE_KEYWORDS):
+    # Whole-word match: 'customer_id' is an identifier, 'paid' and 'width' are not
+    if _name_tokens(column_name) & set(BAD_FEATURE_KEYWORDS):
         return True
 
     unique_ratio = series.nunique(dropna=True) / max(len(series), 1)
 
-    if unique_ratio > 0.95 and series.dtype == "object":
+    if unique_ratio > 0.95 and not is_numeric_dtype(series):
         return True
 
     return False
@@ -92,15 +114,14 @@ def _detect_arithmetic_relationship(df: pd.DataFrame, target_column: str):
     if len(numeric_columns) < 2:
         return findings
 
-    max_pairs = 40
-    pairs_checked = 0
+    # Checking every pair is quadratic, so pair up the columns most related to the target
+    numeric_columns = sorted(
+        numeric_columns,
+        key=lambda col: abs(_safe_corr(numeric_df[col], target) or 0),
+        reverse=True,
+    )[:ARITHMETIC_MAX_COLUMNS]
 
     for col_a, col_b in itertools.combinations(numeric_columns, 2):
-        if pairs_checked >= max_pairs:
-            break
-
-        pairs_checked += 1
-
         a = pd.to_numeric(numeric_df[col_a], errors="coerce")
         b = pd.to_numeric(numeric_df[col_b], errors="coerce")
 
@@ -138,6 +159,66 @@ def _detect_arithmetic_relationship(df: pd.DataFrame, target_column: str):
     return findings
 
 
+def _solo_feature_scores(df: pd.DataFrame, target_column: str, feature_columns: list) -> dict:
+    """
+    How well each feature predicts the target on its own: a shallow decision
+    tree per feature, scored by 3-fold cross-validation (balanced accuracy for
+    classification, R² for regression). Unlike correlation this also covers
+    categorical features and non-linear relationships.
+    """
+    data = df.dropna(subset=[target_column])
+
+    if len(data) > SOLO_MAX_ROWS:
+        data = data.sample(n=SOLO_MAX_ROWS, random_state=42)
+
+    target = data[target_column]
+    task_type = detect_task_type(target)
+
+    if task_type == "classification":
+        y = target.astype(str)
+        class_counts = y.value_counts()
+
+        if len(class_counts) < 2 or class_counts.min() < 3:
+            return {}
+
+        model = DecisionTreeClassifier(max_depth=5, random_state=42)
+        scoring = "balanced_accuracy"
+    else:
+        y = pd.to_numeric(target, errors="coerce")
+
+        if y.isna().any() or len(y) < 30:
+            return {}
+
+        model = DecisionTreeRegressor(max_depth=5, random_state=42)
+        scoring = "r2"
+
+    scores = {}
+
+    for feature in feature_columns[:SOLO_MAX_FEATURES]:
+        series = data[feature]
+
+        if is_numeric_dtype(series) and not is_bool_dtype(series):
+            values = pd.to_numeric(series, errors="coerce")
+            values = values.fillna(values.median())
+        else:
+            values = pd.Series(pd.factorize(series.astype(str))[0], index=series.index)
+
+        if values.isna().all() or values.nunique() < 2:
+            continue
+
+        try:
+            fold_scores = cross_val_score(
+                model, values.to_numpy(dtype=float).reshape(-1, 1), y, cv=3, scoring=scoring
+            )
+        except Exception:
+            continue
+
+        if not np.isnan(fold_scores).any():
+            scores[feature] = round(float(fold_scores.mean()), 4)
+
+    return {"metric": scoring, "scores": scores}
+
+
 def detect_leakage_from_file(file_path: str, target_column: str):
     """
     Main leakage detector.
@@ -146,6 +227,7 @@ def detect_leakage_from_file(file_path: str, target_column: str):
     - feature columns that look like identifiers
     - target-like feature names
     - features with extremely high correlation to target
+    - features that alone predict the target almost perfectly (cross-validated)
     - simple arithmetic leakage
     - duplicated target columns
     """
@@ -171,11 +253,17 @@ def detect_leakage_from_file(file_path: str, target_column: str):
     target = df[target_column]
 
     feature_columns = [col for col in df.columns if col != target_column]
+    date_columns = set(detect_datetime_columns(df[feature_columns]))
+
+    # Pearson correlation with integer class codes means nothing beyond two classes
+    correlation_applies = (
+        detect_task_type(target.dropna()) == "regression" or target.nunique(dropna=True) == 2
+    )
 
     for feature in feature_columns:
         series = df[feature]
 
-        if _is_identifier_like(feature, series):
+        if feature not in date_columns and _is_identifier_like(feature, series):
             findings.append(
                 {
                     "type": "identifier_feature",
@@ -187,9 +275,7 @@ def detect_leakage_from_file(file_path: str, target_column: str):
                 }
             )
 
-        feature_lower = str(feature).lower()
-
-        if any(keyword in feature_lower for keyword in LEAKAGE_KEYWORDS):
+        if _name_tokens(feature) & set(LEAKAGE_KEYWORDS):
             findings.append(
                 {
                     "type": "target_like_feature_name",
@@ -213,7 +299,7 @@ def detect_leakage_from_file(file_path: str, target_column: str):
                 }
             )
 
-        corr = _safe_corr(series, target)
+        corr = _safe_corr(series, target) if correlation_applies else None
 
         if corr is not None and abs(corr) >= 0.95:
             findings.append(
@@ -227,23 +313,31 @@ def detect_leakage_from_file(file_path: str, target_column: str):
                 }
             )
 
+    solo = _solo_feature_scores(df, target_column, feature_columns)
+
+    for feature, score in solo.get("scores", {}).items():
+        if score >= SOLO_SCORE_THRESHOLD:
+            findings.append(
+                {
+                    "type": "single_feature_predicts_target",
+                    "severity": "Critical" if score >= 0.999 else "High",
+                    "feature": feature,
+                    "message": f"Feature '{feature}' predicts target '{target_column}' almost perfectly on its own.",
+                    "evidence": f"A shallow decision tree using only this feature scores cross-validated {solo['metric'].replace('_', ' ')} = {score}.",
+                    "recommendation": "Confirm this value is known before the outcome happens. If it is recorded afterwards or derived from the target, remove it.",
+                }
+            )
+
     findings.extend(_detect_arithmetic_relationship(df, target_column))
 
-    severity_score = 0
+    # One feature can trip several checks; it counts once, at its worst severity
+    worst_by_feature = {}
 
     for item in findings:
-        severity = item.get("severity")
+        points = SEVERITY_POINTS.get(item.get("severity"), 5)
+        worst_by_feature[item["feature"]] = max(worst_by_feature.get(item["feature"], 0), points)
 
-        if severity == "Critical":
-            severity_score += 40
-        elif severity == "High":
-            severity_score += 25
-        elif severity == "Medium":
-            severity_score += 10
-        else:
-            severity_score += 5
-
-    leakage_risk_score = min(100, severity_score)
+    leakage_risk_score = min(100, sum(worst_by_feature.values()))
 
     if leakage_risk_score >= 70:
         risk_level = "Critical"
@@ -281,5 +375,9 @@ def detect_leakage_from_file(file_path: str, target_column: str):
         "risk_level": risk_level,
         "summary": summary,
         "findings": findings,
+        "single_feature_scores": {
+            "metric": solo.get("metric"),
+            "top": sorted(solo.get("scores", {}).items(), key=lambda item: item[1], reverse=True)[:10],
+        },
         "warnings": warnings,
     }

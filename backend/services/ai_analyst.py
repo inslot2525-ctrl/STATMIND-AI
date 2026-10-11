@@ -1,3 +1,23 @@
+import json
+import logging
+
+import anthropic
+
+import config
+
+logger = logging.getLogger(__name__)
+
+MAX_HISTORY_MESSAGES = 12
+
+ANALYST_SYSTEM_PROMPT = """You are the data scientist built into StatMind, an AutoML platform. The user has uploaded a dataset and may have profiled it, trained models, run AutoML and run a leakage check. A JSON snapshot of everything StatMind has computed so far is supplied with the question.
+
+Ground every claim about this dataset or these models in that snapshot, quoting the actual numbers. If the snapshot does not contain what is needed, say which StatMind step would produce it (Statistics Studio, Target Advisor, Train Model, AutoML Compare, Leakage Check) rather than guessing. General machine-learning knowledge is welcome when it explains or qualifies a result.
+
+Be candid about weaknesses: a score close to the baseline, a small test split, class imbalance or a leakage finding matters more to the user than praise.
+
+Your reply is shown in a chat panel that renders plain text only, so write short paragraphs with no Markdown, headings or bullet symbols. Answer the question first, then add at most the one or two caveats that matter most."""
+
+
 def _clean_text(value):
     if value is None:
         return ""
@@ -209,18 +229,122 @@ def _answer_general_question(summary):
     return answer
 
 
-def answer_data_scientist_question(question: str, context: dict):
-    """
-    Rule-based AI analyst.
+def _llm_context(context: dict) -> dict:
+    """The snapshot sent to the model: the summary plus the detail behind the headline numbers."""
+    ml_result = context.get("mlResult") or context.get("ml_result") or {}
+    compare_result = context.get("compareResult") or context.get("compare_result") or {}
+    leakage_result = context.get("leakageResult") or context.get("leakage_result") or {}
+    statistics = context.get("statistics") or {}
 
-    This does not require Gemini/OpenAI API.
-    Later, this can be upgraded to use an LLM by passing the same context.
+    return {
+        **_extract_context_summary(context),
+        "numeric_summary": statistics.get("numeric_summary"),
+        "model": {
+            key: ml_result.get(key)
+            for key in (
+                "target_column", "train_rows", "test_rows", "baseline_metrics", "hyperparameters",
+                "cross_validation", "class_balance", "feature_importance",
+                "dropped_high_cardinality_columns", "warnings",
+            )
+        } if ml_result else None,
+        "model_per_class": (ml_result.get("diagnostics") or {}).get("per_class"),
+        "automl": {
+            key: compare_result.get(key)
+            for key in (
+                "cv_folds", "leaderboard", "test_metrics", "baseline_metrics",
+                "skipped_algorithms", "warnings",
+            )
+        } if compare_result else None,
+        "leakage_findings": leakage_result.get("findings"),
+        "leakage_single_feature_scores": leakage_result.get("single_feature_scores"),
+    }
+
+
+def _answer_with_llm(question: str, context: dict, history: list) -> list:
+    """Ask Claude. Raises anthropic.APIError on API failures and ValueError on an unusable reply."""
+    snapshot = json.dumps(_llm_context(context), default=str)
+
+    messages = [
+        {"role": turn["role"], "content": str(turn["content"])}
+        for turn in (history or [])[-MAX_HISTORY_MESSAGES:]
+        if turn.get("role") in ("user", "assistant") and turn.get("content")
+    ]
+
+    # The API requires the conversation to open with a user turn
+    while messages and messages[0]["role"] != "user":
+        messages.pop(0)
+
+    messages.append(
+        {
+            "role": "user",
+            "content": f"<statmind_snapshot>\n{snapshot}\n</statmind_snapshot>\n\n{question}",
+        }
+    )
+
+    client = anthropic.Anthropic().with_options(timeout=90.0)
+
+    response = client.beta.messages.create(
+        model=config.ANALYST_MODEL,
+        max_tokens=16000,
+        system=ANALYST_SYSTEM_PROMPT,
+        output_config={"effort": "low"},
+        # If the model declines, the API retries on Anthropic's recommended fallback model
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
+        messages=messages,
+    )
+
+    if response.stop_reason == "refusal":
+        raise ValueError("The model declined to answer.")
+
+    text = "\n".join(block.text for block in response.content if block.type == "text")
+    answer = [line.strip() for line in text.splitlines() if line.strip()]
+
+    if not answer:
+        raise ValueError("The model returned an empty answer.")
+
+    return answer
+
+
+def answer_data_scientist_question(question: str, context: dict, history: list = None):
+    """
+    AI analyst. Answers with Claude when Anthropic credentials are configured,
+    grounded in the context StatMind has computed. Without credentials, or if
+    the call fails, it falls back to the built-in rules below, so the feature
+    never depends on the network.
     """
 
     question_clean = _clean_text(question).lower()
 
     if not question_clean:
         raise ValueError("Question cannot be empty.")
+
+    fallback_reason = "No Anthropic credentials are configured, so built-in rules answered."
+
+    if config.ANALYST_LLM_ENABLED:
+        try:
+            return {
+                "question": question,
+                "answer": _answer_with_llm(_clean_text(question), context, history),
+                "analyst_mode": "llm",
+                "model": config.ANALYST_MODEL,
+                "note": "Answered by Claude from the results StatMind computed for this dataset.",
+            }
+        except anthropic.AuthenticationError:
+            logger.error("AI analyst: the Anthropic API key was rejected")
+            fallback_reason = "The Anthropic API key was rejected, so built-in rules answered."
+        except anthropic.RateLimitError:
+            logger.warning("AI analyst: rate limited by the Anthropic API")
+            fallback_reason = "The AI model is rate limited right now, so built-in rules answered."
+        except anthropic.APIStatusError as e:
+            logger.error("AI analyst: Anthropic API error %s: %s", e.status_code, e.message)
+            fallback_reason = "The AI model returned an error, so built-in rules answered."
+        except anthropic.APIConnectionError:
+            logger.warning("AI analyst: could not reach the Anthropic API")
+            fallback_reason = "The AI model could not be reached, so built-in rules answered."
+        except ValueError as e:
+            logger.warning("AI analyst: %s", e)
+            fallback_reason = f"{e} Built-in rules answered instead."
 
     summary = _extract_context_summary(context)
 
@@ -246,5 +370,5 @@ def answer_data_scientist_question(question: str, context: dict):
         "question": question,
         "answer": answer,
         "analyst_mode": "rule_based_contextual",
-        "note": "This analyst uses StatMind's generated context. It can later be upgraded with an LLM API.",
+        "note": fallback_reason,
     }
