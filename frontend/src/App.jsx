@@ -661,13 +661,37 @@ function App() {
                   </div>
                   <h4>Metrics</h4>
                   <div className="mlops-metrics-grid">
-                    {Object.entries(selectedExperiment.metrics || {}).map(([k, v]) => (
-                      <div className="mlops-metric-chip" key={k}>
-                        <span>{k.replace(/_/g, " ")}</span>
-                        <strong>{typeof v === "number" ? v.toFixed(4) : v}</strong>
-                      </div>
-                    ))}
+                    {/* Metrics also hold a confusion matrix and cross-validation details: chips are for numbers */}
+                    {Object.entries(selectedExperiment.metrics || {})
+                      .filter(([, v]) => typeof v === "number")
+                      .map(([k, v]) => (
+                        <div className="mlops-metric-chip" key={k}>
+                          <span>{k.replace(/_/g, " ")}</span>
+                          <strong>{v.toFixed(4)}</strong>
+                        </div>
+                      ))}
                   </div>
+                  {selectedExperiment.metrics?.cross_validation && (
+                    <>
+                      <h4>Cross-validation (AutoML)</h4>
+                      <div className="mlops-metrics-grid">
+                        <div className="mlops-metric-chip">
+                          <span>
+                            {selectedExperiment.metrics.cross_validation.folds}-fold{" "}
+                            {String(selectedExperiment.metrics.cross_validation.metric).replace(/_/g, " ")}
+                          </span>
+                          <strong>
+                            {Number(selectedExperiment.metrics.cross_validation.mean).toFixed(4)} ±{" "}
+                            {Number(selectedExperiment.metrics.cross_validation.std).toFixed(4)}
+                          </strong>
+                        </div>
+                        <div className="mlops-metric-chip">
+                          <span>Tuned</span>
+                          <strong>{selectedExperiment.metrics.cross_validation.tuned ? "Yes" : "Defaults kept"}</strong>
+                        </div>
+                      </div>
+                    </>
+                  )}
                   {Object.keys(selectedExperiment.hyperparameters || {}).length > 0 && (
                     <>
                       <h4>Hyperparameters</h4>
@@ -697,7 +721,7 @@ function App() {
                 <span></span>
               </div>
               {experiments.map((exp) => {
-                const metricEntries = Object.entries(exp.metrics || {});
+                const metricEntries = Object.entries(exp.metrics || {}).filter(([, v]) => typeof v === "number");
                 const primaryMetric = metricEntries.find(
                   ([k]) => k === "accuracy" || k === "f1_weighted" || k === "r2_score"
                 ) || metricEntries[0];
@@ -708,7 +732,7 @@ function App() {
                     <span className="mlops-truncate">{exp.dataset_info?.filename || "—"}</span>
                     <span className="mlops-metric-inline">
                       {primaryMetric
-                        ? <><small>{primaryMetric[0].replace(/_/g, " ")}</small> <strong>{typeof primaryMetric[1] === "number" ? primaryMetric[1].toFixed(4) : primaryMetric[1]}</strong></>
+                        ? <><small>{primaryMetric[0].replace(/_/g, " ")}</small> <strong>{primaryMetric[1].toFixed(4)}</strong></>
                         : "—"}
                     </span>
                     <span className="mlops-time">{new Date(exp.timestamp).toLocaleDateString()}</span>
