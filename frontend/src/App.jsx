@@ -24,6 +24,7 @@ import AuthScreen from "./AuthScreen";
 import AnalystPanel from "./AnalystPanel";
 import { installSpotlight } from "./spotlight";
 import { Leaderboard, LeakageReport, ModelReport } from "./MlResults";
+import ModelOps from "./ModelOps";
 import {
   apiFetch,
   clearSession,
@@ -771,15 +772,22 @@ function App() {
                     <>
                       <h4>Metrics</h4>
                       <div className="mlops-metrics-grid">
-                        {Object.entries(selectedModel.metadata.metrics).map(([k, v]) => (
-                          <div className="mlops-metric-chip" key={k}>
-                            <span>{k.replace(/_/g, " ")}</span>
-                            <strong>{typeof v === "number" ? v.toFixed(4) : v}</strong>
-                          </div>
-                        ))}
+                        {Object.entries(selectedModel.metadata.metrics)
+                          .filter(([, v]) => typeof v === "number")
+                          .map(([k, v]) => (
+                            <div className="mlops-metric-chip" key={k}>
+                              <span>{k.replace(/_/g, " ")}</span>
+                              <strong>{v.toFixed(4)}</strong>
+                            </div>
+                          ))}
                       </div>
                     </>
                   )}
+                  <ModelOps
+                    key={selectedModel.model_id}
+                    model={selectedModel}
+                    stage={selectedModel.versions?.[0]?.stage || "development"}
+                  />
                 </div>
               </div>
             </div>
@@ -804,7 +812,7 @@ function App() {
                     <span>{m.metadata?.target_column || "—"}</span>
                     <span className={`stage-pill stage-${stage}`}>{stage}</span>
                     <span className="mlops-time">{new Date(m.registered_at).toLocaleDateString()}</span>
-                    <button className="mlops-view-btn" onClick={() => setSelectedModel(m)}>View</button>
+                    <button className="mlops-view-btn" onClick={() => setSelectedModel(m)}>Serve &amp; monitor</button>
                   </div>
                 );
               })}
@@ -973,8 +981,8 @@ function App() {
           <span className="step-number">4</span>
           <h3>Explain, predict, track</h3>
           <p>
-            See which features drive the model, score new files, and keep every run, model and
-            dataset version on record.
+            See which features drive the model, score new data from a file or through the API,
+            and get warned when incoming data drifts away from what the model was trained on.
           </p>
         </li>
       </ol>
@@ -1021,6 +1029,13 @@ function App() {
           </p>
         </div>
         <div className="feature-card">
+          <h3>Serving and drift monitoring</h3>
+          <p>
+            Every model has a prediction API, and the production stage decides which model
+            answers it. Recent inputs are tested against the training data, column by column.
+          </p>
+        </div>
+        <div className="feature-card">
           <h3>An analyst to ask</h3>
           <p>
             Ask questions about your results in plain language and export everything as a single
@@ -1059,7 +1074,7 @@ function App() {
         <div className="studio-card">
           <div className="studio-tag">MLOps</div>
           <h3>MLOps Studio</h3>
-          <p>Browse experiments, promote models through stages, and review dataset versions.</p>
+          <p>Browse experiments, promote models, call them through the API, and watch for drift.</p>
           <button
             onClick={() => {
               setCurrentPage("mlops");

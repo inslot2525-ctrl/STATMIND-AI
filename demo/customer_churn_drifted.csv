@@ -1,0 +1,301 @@
+customer_id,signup_date,age,gender,region,plan,contract_type,payment_method,tenure_months,monthly_charges,avg_weekly_usage_hours,support_tickets,late_payments
+CUST200000,2024-04-02,44.0,Male,North,Premium,Monthly,UPI,9,1493.9,7.5,3,0
+CUST200001,2021-10-23,,Female,North,Basic,Monthly,UPI,38,450.45,3.3,4,0
+CUST200002,2023-09-19,34.0,Male,North,Basic,Monthly,Credit Card,15,403.92,2.7,2,1
+CUST200003,2023-08-08,62.0,Female,North,Basic,Monthly,UPI,16,402.51,4.4,0,0
+CUST200004,2022-09-07,66.0,Female,South,Basic,Monthly,Credit Card,27,400.43,,1,0
+CUST200005,2023-09-11,24.0,Female,North,Basic,Monthly,Net Banking,15,385.28,4.8,0,1
+CUST200006,2022-04-25,33.0,Male,North,Standard,Monthly,Credit Card,32,870.5,3.9,2,1
+CUST200007,2024-09-19,57.0,Male,North,Standard,Monthly,Debit Card,3,941.04,12.4,3,0
+CUST200008,2024-04-28,32.0,Female,North,Basic,Monthly,UPI,8,390.92,1.0,0,2
+CUST200009,2021-02-25,27.0,Female,North,Basic,Monthly,UPI,46,401.96,2.2,1,0
+CUST200010,2021-08-18,46.0,Male,North,Premium,Monthly,UPI,40,1294.73,7.8,3,0
+CUST200011,2024-05-22,,Male,North,Basic,Monthly,Debit Card,7,430.31,6.4,0,0
+CUST200012,2023-06-01,39.0,Female,North,Standard,Monthly,UPI,19,853.91,12.8,4,0
+CUST200013,2024-03-26,38.0,Male,West,Basic,Annual,UPI,9,462.24,6.7,0,1
+CUST200014,2021-10-05,30.0,Female,East,Basic,Monthly,UPI,38,385.77,11.0,2,0
+CUST200015,2021-10-29,25.0,Male,North,Premium,Monthly,UPI,38,1406.41,13.9,3,0
+CUST200016,2021-04-29,56.0,Female,North,Standard,Monthly,UPI,44,834.61,4.3,1,0
+CUST200017,2023-09-23,49.0,Female,North,Basic,Monthly,Net Banking,15,385.52,2.2,1,1
+CUST200018,2022-07-08,36.0,Female,North,Standard,Two-year,UPI,29,884.87,7.1,1,0
+CUST200019,2022-04-04,59.0,Male,North,Standard,Annual,UPI,32,809.58,7.3,2,0
+CUST200020,2022-01-27,42.0,Female,South,Basic,Monthly,UPI,35,366.94,3.9,1,0
+CUST200021,2024-05-19,65.0,Female,North,Basic,Monthly,Net Banking,7,377.97,12.8,1,0
+CUST200022,2022-10-31,38.0,Male,West,Basic,Monthly,UPI,26,444.32,4.8,1,0
+CUST200023,2022-05-01,66.0,Female,North,Standard,Monthly,Debit Card,32,699.98,13.3,2,0
+CUST200024,2024-05-13,49.0,Male,North,Standard,Monthly,UPI,7,777.76,12.9,0,1
+CUST200025,2024-03-12,61.0,Male,North,Basic,Monthly,UPI,9,386.32,7.2,1,0
+CUST200026,2022-05-24,60.0,Female,East,Premium,Monthly,UPI,31,1405.88,5.9,2,0
+CUST200027,2021-03-13,26.0,Male,South,Standard,Monthly,Debit Card,45,865.98,14.3,2,2
+CUST200028,2022-05-17,58.0,Female,North,Basic,Monthly,UPI,31,403.99,6.8,1,1
+CUST200029,2023-05-28,39.0,Female,North,Basic,Monthly,UPI,19,370.11,5.6,0,2
+CUST200030,2024-01-07,47.0,Male,South,Standard,Monthly,UPI,11,876.23,5.8,2,0
+CUST200031,2023-02-01,54.0,Female,North,Premium,Monthly,,23,1282.12,8.2,0,1
+CUST200032,2021-03-07,60.0,Female,North,Basic,Monthly,UPI,45,394.47,3.2,1,0
+CUST200033,2024-02-15,52.0,Male,West,Premium,Monthly,UPI,10,1259.23,10.5,3,0
+CUST200034,2022-11-24,45.0,Female,East,Standard,Monthly,Net Banking,25,833.32,2.4,3,0
+CUST200035,2021-10-16,55.0,Female,North,Basic,Monthly,Debit Card,38,376.47,2.8,2,1
+CUST200036,2023-11-24,35.0,Male,North,Standard,Monthly,Credit Card,13,959.99,10.6,0,0
+CUST200037,2022-01-14,60.0,Female,West,Basic,Monthly,Credit Card,35,455.35,5.6,1,0
+CUST200038,2023-02-12,68.0,Female,North,Basic,Annual,Debit Card,22,421.36,4.7,1,1
+CUST200039,2022-01-13,,Female,West,Premium,Monthly,UPI,35,1433.25,,0,2
+CUST200040,2023-09-07,50.0,Male,West,Premium,Monthly,UPI,15,1193.95,14.6,4,0
+CUST200041,2021-05-31,70.0,Female,South,Standard,Monthly,Debit Card,43,671.54,2.0,1,0
+CUST200042,2021-10-11,54.0,Male,North,Premium,Monthly,Credit Card,38,1222.21,7.8,1,1
+CUST200043,2022-02-27,23.0,Female,North,Basic,Monthly,Net Banking,34,405.22,6.9,1,1
+CUST200044,2021-11-09,47.0,Male,North,Basic,Monthly,Credit Card,37,406.38,,0,1
+CUST200045,2024-01-31,30.0,Female,North,Standard,Monthly,UPI,11,902.01,3.5,2,1
+CUST200046,2021-08-04,24.0,Female,North,Standard,Monthly,,40,706.06,1.8,0,0
+CUST200047,2022-02-05,44.0,Male,North,Basic,Monthly,UPI,34,422.09,14.2,1,0
+CUST200048,2024-07-15,35.0,Male,North,Basic,Monthly,Credit Card,5,428.75,4.9,0,0
+CUST200049,2024-02-28,56.0,Male,North,Standard,Monthly,UPI,10,847.52,4.7,3,0
+CUST200050,2022-04-05,52.0,Male,North,Basic,Monthly,UPI,32,397.09,4.7,3,1
+CUST200051,2021-05-30,64.0,Male,North,Standard,Monthly,Debit Card,43,916.02,4.7,2,0
+CUST200052,2023-05-06,35.0,Female,East,Basic,Monthly,UPI,19,410.28,8.6,0,0
+CUST200053,2022-05-13,26.0,Male,South,Basic,Monthly,Debit Card,31,352.14,2.5,3,1
+CUST200054,2021-03-18,66.0,Female,North,Basic,Annual,UPI,45,362.29,12.9,1,0
+CUST200055,2022-03-17,38.0,Male,South,Basic,Monthly,Credit Card,33,447.63,9.6,0,4
+CUST200056,2023-04-11,39.0,Female,North,Premium,Monthly,Credit Card,20,1601.65,14.9,2,0
+CUST200057,2023-09-17,23.0,Male,North,Premium,Monthly,UPI,15,1510.81,10.9,0,2
+CUST200058,2022-11-27,61.0,Male,North,Premium,Monthly,UPI,25,1397.88,7.6,1,1
+CUST200059,2024-03-07,30.0,Male,North,Basic,Monthly,UPI,9,426.61,5.2,2,1
+CUST200060,2021-06-22,36.0,Female,North,Basic,Monthly,Net Banking,42,450.64,2.3,0,0
+CUST200061,2022-09-22,28.0,Male,North,Premium,Monthly,UPI,27,1563.11,11.0,3,0
+CUST200062,2021-05-16,50.0,Male,North,Standard,Annual,Debit Card,43,856.9,13.6,1,0
+CUST200063,2022-01-10,19.0,Male,South,Premium,Monthly,UPI,35,1420.6,10.8,1,1
+CUST200064,2023-10-21,53.0,Male,North,Basic,Monthly,Credit Card,14,441.58,2.9,1,1
+CUST200065,2024-09-16,38.0,Male,East,Standard,Monthly,UPI,3,839.26,7.5,0,0
+CUST200066,2021-10-01,30.0,Female,North,Standard,Monthly,Credit Card,39,817.66,7.1,1,0
+CUST200067,2022-06-27,30.0,Male,North,Premium,Monthly,Credit Card,30,1572.39,9.7,0,1
+CUST200068,2024-03-29,49.0,Male,North,Basic,Monthly,UPI,9,366.47,8.5,3,0
+CUST200069,2021-09-14,59.0,Male,East,Basic,Monthly,Debit Card,39,337.76,6.3,0,0
+CUST200070,2022-10-20,33.0,Male,North,Basic,Monthly,Debit Card,26,406.81,,1,1
+CUST200071,2022-06-06,23.0,Male,North,Basic,Monthly,Net Banking,30,461.89,4.5,2,1
+CUST200072,2024-07-01,52.0,Male,North,Basic,Monthly,UPI,6,402.83,10.7,3,1
+CUST200073,2023-01-14,34.0,Male,South,Standard,Monthly,Net Banking,23,776.75,2.4,1,0
+CUST200074,2024-08-06,59.0,Female,North,Standard,Monthly,Debit Card,4,831.07,7.5,3,0
+CUST200075,2021-07-31,66.0,Male,South,Premium,Monthly,Debit Card,41,1256.24,8.5,0,2
+CUST200076,2022-10-27,47.0,Male,East,Premium,Monthly,Credit Card,26,1359.05,5.8,1,1
+CUST200077,2022-04-24,55.0,Male,North,Basic,Monthly,Credit Card,32,395.19,9.4,1,0
+CUST200078,2024-02-25,62.0,Female,North,Premium,Monthly,UPI,10,1310.39,10.6,0,0
+CUST200079,2021-10-14,54.0,Male,South,Premium,Monthly,Debit Card,38,1355.43,7.7,1,0
+CUST200080,2023-11-09,56.0,Female,Central,Premium,Monthly,UPI,13,1302.93,10.3,3,0
+CUST200081,2022-06-27,29.0,Male,West,Basic,Monthly,Credit Card,30,454.77,2.7,3,2
+CUST200082,2024-02-12,36.0,Male,North,Premium,Monthly,Credit Card,10,1349.26,8.4,2,1
+CUST200083,2022-01-12,63.0,Female,East,Basic,Monthly,Debit Card,35,460.74,9.7,0,0
+CUST200084,2022-08-10,62.0,Male,North,Standard,Monthly,Credit Card,28,855.34,2.4,3,0
+CUST200085,2022-11-18,57.0,Female,North,Basic,Monthly,UPI,25,421.63,9.6,1,0
+CUST200086,2022-10-14,68.0,Female,North,Premium,Monthly,Credit Card,26,1259.42,10.4,1,2
+CUST200087,2022-09-16,52.0,Male,North,Basic,Monthly,Net Banking,27,350.21,7.0,2,1
+CUST200088,2023-10-28,36.0,Female,East,Basic,Monthly,,14,468.41,1.8,0,1
+CUST200089,2021-09-15,34.0,Female,North,Basic,Monthly,UPI,39,402.07,4.4,2,0
+CUST200090,2022-09-19,68.0,Male,North,Standard,Annual,Credit Card,27,783.51,8.7,2,1
+CUST200091,2022-09-17,22.0,Female,Central,Standard,Monthly,UPI,27,730.44,6.2,2,1
+CUST200092,2024-09-10,46.0,Male,North,Premium,Monthly,Net Banking,3,1383.13,9.0,1,0
+CUST200093,2021-07-19,39.0,Male,North,Premium,Monthly,Debit Card,41,1217.29,8.8,2,1
+CUST200094,2023-06-10,46.0,Female,North,Premium,Annual,UPI,18,1384.93,7.1,2,1
+CUST200095,2023-06-01,38.0,Male,Central,Basic,Monthly,Credit Card,19,476.46,6.1,2,3
+CUST200096,2023-01-18,25.0,Male,North,Basic,Monthly,UPI,23,383.07,,0,0
+CUST200097,2022-09-10,33.0,Female,North,Basic,Monthly,UPI,27,414.43,8.7,2,2
+CUST200098,2021-04-16,56.0,Male,North,Premium,Monthly,UPI,44,1557.62,7.8,1,1
+CUST200099,2021-08-15,65.0,Female,North,Basic,Monthly,Debit Card,40,409.99,6.6,2,0
+CUST200100,2022-10-15,57.0,Female,North,Premium,Monthly,Debit Card,26,1174.49,10.6,1,0
+CUST200101,2021-05-09,25.0,Male,North,Premium,Monthly,Debit Card,43,1273.66,7.3,2,0
+CUST200102,2024-09-04,39.0,Male,North,Standard,Monthly,UPI,3,818.23,,1,1
+CUST200103,2024-01-28,20.0,Male,North,Premium,Monthly,Net Banking,11,1472.7,5.3,0,1
+CUST200104,2022-06-23,48.0,Female,North,Basic,Monthly,Debit Card,30,464.6,7.0,1,0
+CUST200105,2023-06-13,26.0,Female,North,Standard,Monthly,UPI,18,832.15,2.4,0,1
+CUST200106,2024-09-12,44.0,Female,East,Premium,Monthly,UPI,3,1156.74,11.9,0,1
+CUST200107,2022-04-08,,Male,North,Standard,Monthly,Credit Card,32,898.57,9.0,1,3
+CUST200108,2021-12-17,29.0,Male,North,Basic,Monthly,Net Banking,36,431.19,3.5,1,1
+CUST200109,2024-06-16,49.0,Female,Central,Premium,Monthly,Credit Card,6,1231.26,4.3,2,1
+CUST200110,2023-06-11,57.0,Female,North,Standard,Monthly,UPI,18,805.78,10.4,2,2
+CUST200111,2023-09-08,69.0,Female,North,Basic,Monthly,UPI,15,401.36,2.3,1,1
+CUST200112,2021-01-28,25.0,Female,West,Standard,Monthly,,47,935.06,11.8,0,0
+CUST200113,2022-12-20,,Male,North,Basic,Monthly,Credit Card,24,429.81,4.2,4,0
+CUST200114,2022-11-29,62.0,Male,North,Premium,Monthly,,25,1318.83,5.7,4,0
+CUST200115,2022-11-02,22.0,Female,North,Basic,Monthly,UPI,26,389.87,7.4,0,3
+CUST200116,2024-04-22,28.0,Female,North,Standard,Annual,Credit Card,8,941.27,4.8,0,1
+CUST200117,2022-09-29,45.0,Male,North,Standard,Monthly,UPI,27,918.93,12.0,1,0
+CUST200118,2023-11-24,68.0,Male,East,Basic,Monthly,UPI,13,433.71,3.7,0,0
+CUST200119,2023-02-21,21.0,Male,North,Basic,Monthly,UPI,22,350.44,2.1,0,0
+CUST200120,2023-01-29,61.0,Female,North,Basic,Monthly,UPI,23,422.72,8.7,1,0
+CUST200121,2022-04-12,32.0,Female,North,Premium,Monthly,UPI,32,1437.02,4.9,1,0
+CUST200122,2021-10-25,44.0,Male,West,Basic,Monthly,Net Banking,38,372.32,6.6,1,0
+CUST200123,2021-05-22,69.0,Female,North,Standard,Monthly,UPI,43,913.59,7.2,2,0
+CUST200124,2024-04-28,49.0,Male,North,Basic,Monthly,Credit Card,8,374.79,2.7,1,0
+CUST200125,2024-07-29,50.0,Female,South,Standard,Monthly,Net Banking,5,805.28,9.4,2,0
+CUST200126,2024-10-02,56.0,Male,West,Standard,Monthly,Net Banking,2,829.03,3.0,0,0
+CUST200127,2021-04-07,54.0,Male,North,Basic,Monthly,Net Banking,44,424.06,2.2,0,0
+CUST200128,2022-06-21,38.0,Female,East,Premium,Monthly,Debit Card,30,1482.43,13.0,1,0
+CUST200129,2022-06-10,68.0,Female,North,Basic,Monthly,Net Banking,30,372.6,3.5,2,1
+CUST200130,2021-07-11,27.0,Female,North,Standard,Monthly,Credit Card,41,712.04,4.7,0,1
+CUST200131,2021-02-03,28.0,Female,North,Standard,Monthly,UPI,46,797.09,21.9,0,0
+CUST200132,2022-02-14,42.0,Female,North,Standard,Monthly,Credit Card,34,876.82,2.8,0,1
+CUST200133,2024-04-19,57.0,Female,North,Premium,Monthly,UPI,8,1398.68,6.6,1,0
+CUST200134,2021-11-14,66.0,Female,North,Premium,Monthly,Credit Card,37,1261.22,9.8,3,0
+CUST200135,2022-07-09,39.0,Female,North,Premium,Monthly,Net Banking,29,1340.84,6.7,1,1
+CUST200136,2024-03-22,65.0,Female,East,Basic,Monthly,UPI,9,420.05,7.1,0,1
+CUST200137,2024-03-08,63.0,Male,South,Standard,Monthly,UPI,9,922.5,5.7,3,0
+CUST200138,2023-01-19,40.0,Female,North,Basic,Monthly,Credit Card,23,429.14,2.2,1,0
+CUST200139,2023-12-26,30.0,Male,North,Basic,Monthly,UPI,12,384.82,4.3,0,1
+CUST200140,2022-03-21,70.0,Male,South,Standard,Monthly,Credit Card,33,850.55,7.3,0,1
+CUST200141,2021-03-12,25.0,Female,East,Standard,Monthly,Net Banking,45,795.23,5.6,2,0
+CUST200142,2021-12-10,64.0,Male,North,Basic,Monthly,UPI,36,427.64,4.5,0,2
+CUST200143,2023-12-04,20.0,Male,South,Basic,Monthly,Debit Card,12,387.36,3.7,2,0
+CUST200144,2022-07-15,21.0,Female,North,Standard,Monthly,Credit Card,29,822.49,3.5,3,0
+CUST200145,2024-10-16,41.0,Female,South,Basic,Monthly,Net Banking,2,461.07,5.9,1,0
+CUST200146,2021-08-13,36.0,Female,East,Basic,Monthly,UPI,40,432.61,7.4,3,2
+CUST200147,2022-10-28,43.0,Male,North,Basic,Monthly,Net Banking,26,421.57,7.2,2,0
+CUST200148,2024-04-21,42.0,Male,North,Premium,Monthly,UPI,8,1273.76,15.1,3,1
+CUST200149,2023-09-18,26.0,Female,North,Standard,Monthly,Credit Card,15,905.99,5.2,1,1
+CUST200150,2021-09-14,64.0,Female,North,Premium,Monthly,Net Banking,39,1540.3,13.0,2,1
+CUST200151,2022-11-28,68.0,Male,North,Basic,Monthly,Credit Card,25,441.7,4.8,3,0
+CUST200152,2024-01-29,20.0,Male,North,Premium,Monthly,UPI,11,1561.24,6.8,2,0
+CUST200153,2022-06-09,45.0,Female,North,Premium,Monthly,Credit Card,30,1302.75,17.4,2,0
+CUST200154,2023-08-08,40.0,Female,West,Standard,Monthly,UPI,16,806.43,7.2,0,1
+CUST200155,2024-03-05,33.0,Male,North,Basic,Monthly,Debit Card,9,513.46,2.0,1,2
+CUST200156,2022-06-17,26.0,Female,North,Standard,Monthly,Credit Card,30,972.38,7.6,1,0
+CUST200157,2021-04-13,47.0,Male,North,Premium,Monthly,UPI,44,1415.09,12.1,1,0
+CUST200158,2024-03-15,48.0,Female,North,Basic,Annual,Debit Card,9,459.25,3.5,1,1
+CUST200159,2024-01-13,52.0,Male,North,Basic,Monthly,Debit Card,11,414.05,8.9,1,0
+CUST200160,2023-10-26,64.0,Male,East,Basic,Two-year,UPI,14,378.75,3.7,3,2
+CUST200161,2022-08-08,41.0,Female,North,Premium,Monthly,Debit Card,28,1399.3,10.4,2,0
+CUST200162,2021-05-21,33.0,Male,North,Standard,Monthly,Net Banking,43,827.2,3.4,2,2
+CUST200163,2024-02-16,28.0,Male,West,Basic,Monthly,Net Banking,10,422.99,3.5,0,0
+CUST200164,2023-08-02,53.0,Male,North,Standard,Monthly,UPI,17,873.57,3.6,1,1
+CUST200165,2022-06-02,68.0,Male,North,Basic,Monthly,Credit Card,31,410.47,1.7,0,0
+CUST200166,2024-04-22,43.0,Female,North,Basic,Monthly,UPI,8,397.33,7.0,3,0
+CUST200167,2022-03-30,48.0,Male,North,Standard,Monthly,Credit Card,33,724.26,5.5,0,0
+CUST200168,2024-08-26,69.0,Female,North,Basic,Monthly,Credit Card,4,400.97,4.0,0,2
+CUST200169,2023-08-30,58.0,Female,North,Basic,Monthly,UPI,16,423.0,7.7,1,1
+CUST200170,2021-05-16,32.0,Female,North,Standard,Monthly,Credit Card,43,847.17,6.0,1,1
+CUST200171,2024-10-30,40.0,Female,North,Standard,Monthly,UPI,2,703.13,5.0,1,1
+CUST200172,2023-04-04,41.0,Female,North,Premium,Monthly,UPI,20,1421.08,8.3,2,0
+CUST200173,2022-07-31,21.0,Male,North,Standard,Monthly,Credit Card,29,866.37,9.6,1,1
+CUST200174,2022-07-23,69.0,Male,North,Basic,Monthly,Credit Card,29,429.45,12.5,2,2
+CUST200175,2022-11-16,50.0,Male,North,Basic,Monthly,UPI,25,401.51,3.3,3,0
+CUST200176,2024-07-21,51.0,Male,North,Standard,Monthly,UPI,5,760.13,3.3,0,2
+CUST200177,2021-05-16,63.0,Female,North,Premium,Monthly,UPI,43,1423.57,7.1,0,1
+CUST200178,2022-07-23,42.0,Female,North,Basic,Monthly,UPI,29,389.06,2.9,2,1
+CUST200179,2022-08-18,70.0,Male,North,Basic,Monthly,Credit Card,28,402.8,4.0,2,1
+CUST200180,2021-06-02,47.0,Female,East,Standard,Monthly,Credit Card,43,769.18,2.4,0,2
+CUST200181,2023-11-30,,Male,North,Basic,Monthly,Debit Card,13,406.32,7.0,0,0
+CUST200182,2023-08-09,30.0,Male,North,Basic,Monthly,Credit Card,16,450.02,11.8,1,1
+CUST200183,2021-05-07,35.0,Female,South,Basic,Monthly,Credit Card,43,427.35,1.1,2,1
+CUST200184,2021-03-03,24.0,Female,South,Basic,Annual,Debit Card,46,361.86,,1,3
+CUST200185,2024-04-17,68.0,Male,East,Premium,Monthly,UPI,8,1491.03,6.1,1,0
+CUST200186,2022-11-04,46.0,Male,North,Premium,Monthly,Credit Card,25,1304.55,16.3,0,1
+CUST200187,2024-07-16,21.0,Male,North,Basic,Monthly,UPI,5,414.27,9.6,2,0
+CUST200188,2023-12-06,58.0,Female,North,Basic,Monthly,Debit Card,12,419.36,9.6,0,0
+CUST200189,2023-07-20,52.0,Male,North,Standard,Monthly,UPI,17,899.15,3.3,1,0
+CUST200190,2022-02-01,59.0,Female,North,Basic,Monthly,Credit Card,35,397.25,7.1,3,0
+CUST200191,2024-10-25,36.0,Female,West,Basic,Monthly,UPI,2,373.68,4.7,2,2
+CUST200192,2021-10-29,33.0,Female,North,Premium,Monthly,Debit Card,38,1382.34,8.5,0,0
+CUST200193,2022-07-30,67.0,Female,South,Basic,Monthly,UPI,29,405.64,,2,0
+CUST200194,2023-01-01,27.0,Female,North,Premium,Monthly,UPI,24,1311.1,5.2,4,0
+CUST200195,2022-06-12,18.0,Male,North,Standard,Monthly,Debit Card,30,845.49,6.2,0,1
+CUST200196,2024-08-23,68.0,Male,West,Premium,Monthly,Net Banking,4,1453.71,4.5,0,1
+CUST200197,2024-02-21,63.0,Male,North,Basic,Monthly,Net Banking,10,476.23,6.9,1,2
+CUST200198,2024-10-18,38.0,Male,North,Standard,Monthly,UPI,2,867.83,9.7,2,1
+CUST200199,2021-03-21,57.0,Male,West,Premium,Monthly,Net Banking,45,1451.45,5.8,2,0
+CUST200200,2023-02-10,28.0,Female,North,Basic,Monthly,Debit Card,22,466.03,13.6,0,2
+CUST200201,2022-06-11,68.0,Male,North,Basic,Monthly,Debit Card,30,373.28,3.8,2,0
+CUST200202,2023-08-16,58.0,Male,South,Basic,Monthly,Net Banking,16,347.93,1.5,2,0
+CUST200203,2024-10-06,40.0,Male,Central,Premium,Monthly,UPI,2,1401.36,17.7,2,2
+CUST200204,2023-02-26,38.0,Female,West,Basic,Monthly,Credit Card,22,417.86,3.9,3,0
+CUST200205,2023-04-12,46.0,Female,North,Standard,Monthly,Debit Card,20,775.87,1.5,0,1
+CUST200206,2024-07-14,33.0,Male,North,Standard,Monthly,Debit Card,5,751.98,5.0,0,0
+CUST200207,2022-04-07,44.0,Male,North,Standard,Monthly,UPI,32,673.15,3.0,2,2
+CUST200208,2024-06-08,46.0,Female,North,Standard,Monthly,UPI,6,808.97,4.0,3,3
+CUST200209,2022-03-17,23.0,Female,South,Standard,Monthly,Credit Card,33,819.93,6.4,4,0
+CUST200210,2022-01-09,34.0,Male,East,Standard,Annual,UPI,35,885.89,5.5,0,0
+CUST200211,2021-09-10,21.0,Male,North,Basic,Monthly,Credit Card,39,381.72,12.5,3,0
+CUST200212,2021-03-18,67.0,Female,North,Standard,Monthly,Debit Card,45,794.44,7.4,3,1
+CUST200213,2021-02-25,22.0,Male,North,Basic,Monthly,Credit Card,46,390.79,7.3,2,1
+CUST200214,2023-10-06,42.0,Male,North,Standard,Monthly,Credit Card,14,705.9,15.1,2,0
+CUST200215,2021-09-04,47.0,Male,South,Basic,Monthly,Net Banking,39,465.5,10.8,1,0
+CUST200216,2023-05-01,19.0,Female,North,Standard,Monthly,UPI,20,808.09,5.7,1,0
+CUST200217,2024-01-28,59.0,Male,North,Basic,Monthly,Debit Card,11,401.31,9.1,3,1
+CUST200218,2024-02-09,69.0,Female,West,Premium,Monthly,Credit Card,10,1267.57,8.1,2,1
+CUST200219,2021-06-20,27.0,Female,West,Standard,Monthly,Credit Card,42,768.43,7.2,2,0
+CUST200220,2023-12-02,47.0,Female,North,Basic,Monthly,UPI,13,433.48,4.9,2,1
+CUST200221,2022-11-13,36.0,Male,South,Standard,Monthly,UPI,25,879.52,16.3,1,0
+CUST200222,2022-02-01,48.0,Male,South,Basic,Monthly,Credit Card,35,408.67,8.3,1,0
+CUST200223,2023-10-08,45.0,Male,West,Standard,Monthly,UPI,14,846.19,9.3,4,0
+CUST200224,2021-10-12,55.0,Female,North,Premium,Annual,Credit Card,38,1356.33,10.3,2,0
+CUST200225,2024-04-24,42.0,Female,North,Standard,Monthly,UPI,8,810.16,5.2,1,0
+CUST200226,2023-12-06,49.0,Female,North,Premium,Monthly,Credit Card,12,1365.56,6.3,2,0
+CUST200227,2023-03-22,63.0,Female,North,Standard,Monthly,UPI,21,712.99,10.6,3,0
+CUST200228,2022-04-27,33.0,Male,North,Standard,Monthly,UPI,32,821.69,5.5,0,1
+CUST200229,2023-08-10,29.0,Male,East,Basic,Monthly,Debit Card,16,371.63,4.0,0,0
+CUST200230,2023-06-04,62.0,Male,North,Basic,Monthly,Credit Card,18,416.68,2.7,1,0
+CUST200231,2022-04-15,44.0,Male,North,Standard,Monthly,Debit Card,32,847.47,7.9,2,1
+CUST200232,2022-12-22,70.0,Male,North,Basic,Monthly,Net Banking,24,410.18,6.0,0,0
+CUST200233,2021-07-01,37.0,Male,North,Standard,Monthly,UPI,42,830.64,6.1,2,1
+CUST200234,2021-03-28,20.0,Male,North,Basic,Monthly,UPI,45,430.01,3.4,1,0
+CUST200235,2024-08-12,54.0,Female,North,Standard,Monthly,UPI,4,764.04,2.5,0,0
+CUST200236,2024-09-22,60.0,Male,East,Standard,Monthly,Debit Card,3,876.16,5.7,3,0
+CUST200237,2023-04-14,55.0,Male,North,Basic,Monthly,Credit Card,20,409.42,8.8,1,0
+CUST200238,2022-10-15,62.0,Female,South,Premium,Monthly,Debit Card,26,1490.0,7.7,0,0
+CUST200239,2023-05-19,59.0,Male,North,Premium,Monthly,Credit Card,19,1279.33,12.8,0,0
+CUST200240,2022-09-05,35.0,Female,South,Standard,Monthly,Credit Card,27,843.06,7.1,1,2
+CUST200241,2021-03-28,52.0,Male,Central,Premium,Monthly,UPI,45,1508.43,6.2,2,0
+CUST200242,2022-05-30,48.0,Female,South,Basic,Annual,Debit Card,31,320.24,8.0,3,1
+CUST200243,2023-07-18,23.0,Male,East,Standard,Monthly,,17,810.01,16.5,1,1
+CUST200244,2022-05-15,50.0,Female,Central,Basic,Monthly,UPI,31,444.17,2.3,2,2
+CUST200245,2023-04-26,54.0,Female,South,Basic,Monthly,Debit Card,20,413.53,4.8,3,0
+CUST200246,2021-02-23,33.0,Female,East,Basic,Annual,Credit Card,46,418.02,4.4,0,1
+CUST200247,2021-10-20,47.0,Male,North,Standard,Monthly,UPI,38,758.32,13.2,1,0
+CUST200248,2024-07-11,,Female,North,Basic,Monthly,Credit Card,5,378.08,3.2,2,2
+CUST200249,2022-03-28,45.0,Male,West,Basic,Monthly,Debit Card,33,395.89,5.6,2,1
+CUST200250,2024-08-25,33.0,Male,North,Standard,Monthly,Debit Card,4,957.16,4.3,1,0
+CUST200251,2024-02-17,54.0,Female,North,Basic,Monthly,Net Banking,10,360.14,3.7,3,0
+CUST200252,2024-04-15,42.0,Male,North,Basic,Monthly,Credit Card,8,412.58,4.8,1,0
+CUST200253,2023-01-17,45.0,Male,North,Premium,Monthly,UPI,23,1413.1,9.6,2,0
+CUST200254,2024-10-22,46.0,Male,North,Basic,Monthly,UPI,2,414.77,5.8,0,1
+CUST200255,2023-04-13,37.0,Female,South,Standard,Monthly,Credit Card,20,993.61,4.2,0,0
+CUST200256,2024-06-09,37.0,Female,North,Basic,Annual,Credit Card,6,472.79,3.7,1,0
+CUST200257,2023-03-23,35.0,Female,South,Standard,Monthly,Net Banking,21,801.38,13.3,1,1
+CUST200258,2021-04-07,66.0,Male,West,Basic,Monthly,Debit Card,44,390.3,5.7,2,0
+CUST200259,2021-05-17,52.0,Male,North,Premium,Monthly,Credit Card,43,1406.82,10.6,1,2
+CUST200260,2023-09-03,69.0,Female,North,Standard,Annual,Net Banking,15,864.73,,0,0
+CUST200261,2023-08-19,50.0,Female,North,Premium,Two-year,UPI,16,1344.52,12.3,0,4
+CUST200262,2021-06-10,46.0,Male,East,Standard,Monthly,Debit Card,42,797.89,4.7,0,0
+CUST200263,2023-05-02,48.0,Male,South,Basic,Monthly,Debit Card,20,416.24,9.0,1,1
+CUST200264,2023-01-15,39.0,Female,North,Standard,Two-year,Credit Card,23,925.07,8.4,1,0
+CUST200265,2022-11-29,44.0,Female,North,Standard,Annual,UPI,25,701.98,3.3,3,0
+CUST200266,2021-09-02,49.0,Female,East,Standard,Monthly,Debit Card,40,758.21,7.5,0,0
+CUST200267,2024-05-17,60.0,Female,North,Standard,Monthly,Credit Card,7,918.04,7.7,1,0
+CUST200268,2024-09-17,68.0,Female,North,Standard,Monthly,UPI,3,740.07,4.3,3,1
+CUST200269,2021-04-16,47.0,Male,North,Standard,Monthly,Credit Card,44,748.17,8.8,1,0
+CUST200270,2024-05-07,59.0,Female,North,Basic,Annual,Credit Card,7,447.34,4.4,2,0
+CUST200271,2024-07-05,37.0,Male,North,Basic,Monthly,Net Banking,5,353.49,5.1,2,0
+CUST200272,2023-02-14,51.0,Male,West,Premium,Monthly,UPI,22,1158.75,5.9,1,1
+CUST200273,2024-03-18,27.0,Female,North,Basic,Monthly,UPI,9,454.11,7.5,1,1
+CUST200274,2024-03-26,45.0,Male,North,Basic,Annual,Debit Card,9,429.43,7.5,1,1
+CUST200275,2022-08-11,56.0,Male,North,Basic,Monthly,UPI,28,498.44,,1,1
+CUST200276,2023-11-17,63.0,Male,North,Basic,Monthly,Net Banking,13,404.61,4.4,2,4
+CUST200277,2021-12-16,49.0,Male,West,Basic,Monthly,UPI,36,365.11,7.5,1,0
+CUST200278,2021-09-27,59.0,Female,North,Premium,Monthly,Credit Card,39,1446.52,6.1,1,0
+CUST200279,2021-03-05,57.0,Female,North,Premium,Monthly,Net Banking,45,1338.76,13.0,1,0
+CUST200280,2021-12-23,69.0,Female,North,Basic,Monthly,Credit Card,36,468.23,2.1,0,3
+CUST200281,2021-08-23,18.0,Male,North,Standard,Monthly,UPI,40,849.07,11.1,1,1
+CUST200282,2023-11-22,61.0,Female,South,Standard,Monthly,Credit Card,13,812.22,4.8,0,0
+CUST200283,2024-01-21,47.0,Male,East,Standard,Monthly,Net Banking,11,898.16,12.4,3,1
+CUST200284,2024-01-16,36.0,Female,North,Standard,Monthly,Credit Card,11,714.48,5.5,1,1
+CUST200285,2023-12-08,51.0,Female,North,Premium,Monthly,Debit Card,12,1323.31,5.2,2,0
+CUST200286,2022-04-21,67.0,Female,North,Basic,Monthly,Credit Card,32,327.94,5.0,2,1
+CUST200287,2023-10-12,18.0,Male,North,Basic,Monthly,Debit Card,14,446.13,1.5,3,1
+CUST200288,2023-02-04,56.0,Male,South,Basic,Monthly,UPI,22,343.53,1.3,0,0
+CUST200289,2021-10-05,45.0,Male,Central,Standard,Monthly,UPI,38,910.63,5.8,2,0
+CUST200290,2022-08-01,42.0,Male,North,Basic,Monthly,Net Banking,29,431.64,10.3,3,0
+CUST200291,2021-07-31,30.0,Female,North,Premium,Monthly,Net Banking,41,1518.32,8.6,0,0
+CUST200292,2024-01-15,39.0,Male,North,Standard,Monthly,UPI,11,849.0,4.0,1,0
+CUST200293,2024-01-12,67.0,Male,North,Standard,Monthly,UPI,11,825.87,1.1,2,0
+CUST200294,2023-01-18,34.0,Female,North,Premium,Monthly,Credit Card,23,1083.8,15.7,0,0
+CUST200295,2022-02-27,43.0,Female,North,Standard,Monthly,Credit Card,34,1025.21,4.7,1,2
+CUST200296,2024-09-01,34.0,Male,North,Standard,Monthly,UPI,4,780.77,7.8,0,0
+CUST200297,2022-04-30,60.0,Female,South,Basic,Monthly,Debit Card,32,408.57,1.6,3,0
+CUST200298,2021-02-23,30.0,Female,North,Premium,Monthly,Debit Card,46,1181.24,7.1,0,0
+CUST200299,2022-06-27,20.0,Male,North,Basic,Monthly,Credit Card,30,351.35,15.4,0,0

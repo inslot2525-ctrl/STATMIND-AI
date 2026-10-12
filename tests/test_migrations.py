@@ -67,7 +67,7 @@ def test_legacy_database_upgrades_and_keeps_data(legacy_dir):
     conn = sqlite3.connect(legacy_dir / "statmind.db")
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     assert {"users", "jobs", "artifacts", "alembic_version"} <= tables
-    assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0003"
+    assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0004"
     assert conn.execute("SELECT storage_key, owner_id, rows FROM datasets").fetchone() == ("uploads/sales.csv", None, 20)
     assert conn.execute("SELECT storage_key FROM models").fetchone() == ("models/random_forest_y_1234abcd.pkl",)
     conn.close()

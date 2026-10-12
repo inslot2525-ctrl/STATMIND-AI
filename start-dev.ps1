@@ -4,7 +4,7 @@
 #   API      http://127.0.0.1:8000   StatMind backend
 #   App      http://localhost:5173   StatMind frontend
 #
-# Usage:  .\start-dev.ps1            everything
+# Usage:  .\start-dev.ps1            everything (services already running are left alone)
 #         .\start-dev.ps1 -Plain     just the API and the app, no lakeFS or MLflow
 #
 # lakeFS credentials are generated on first run and kept in lakefs-data\credentials.json
@@ -20,6 +20,26 @@ function Start-Service-Window($title, $workdir, $command) {
     Start-Process powershell -WorkingDirectory $workdir -ArgumentList @(
         "-NoExit", "-Command", "`$host.UI.RawUI.WindowTitle = '$title'; $command"
     )
+}
+
+function Test-Up($url) {
+    try {
+        Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 2 | Out-Null
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+# Start a service unless it is already answering, so the script can be re-run
+# to bring back only what was closed.
+function Start-Unless-Up($title, $url, $workdir, $command) {
+    if (Test-Up $url) {
+        Write-Host "$title is already running"
+        return
+    }
+    Start-Service-Window $title $workdir $command
+    Wait-For $title $url
 }
 
 function Wait-For($name, $url) {
@@ -69,8 +89,7 @@ if (-not $Plain) {
             $lakefsEnv += "`$env:LAKEFS_INSTALLATION_SECRET_ACCESS_KEY = '$($credentials.secret_access_key)'"
         }
         $lakefsEnv = $lakefsEnv -join "; "
-        Start-Service-Window "lakeFS" $root "$lakefsEnv; & '$lakefs' run $mode"
-        Wait-For "lakeFS" "http://127.0.0.1:8001/api/v1/healthcheck"
+        Start-Unless-Up "lakeFS" "http://127.0.0.1:8001/api/v1/healthcheck" $root "$lakefsEnv; & '$lakefs' run $mode"
 
         $backendEnv += "`$env:LAKEFS_ENDPOINT = 'http://127.0.0.1:8001'; "
         $backendEnv += "`$env:LAKEFS_ACCESS_KEY_ID = '$($credentials.access_key_id)'; "
@@ -81,16 +100,13 @@ if (-not $Plain) {
 
     $mlflowData = Join-Path $root "mlflow-data"
     New-Item -ItemType Directory -Force $mlflowData | Out-Null
-    Start-Service-Window "MLflow" $mlflowData "& '$mlflow' server --host 127.0.0.1 --port 5000 --backend-store-uri sqlite:///mlflow.db --artifacts-destination ./mlartifacts"
-    Wait-For "MLflow" "http://127.0.0.1:5000/health"
+    Start-Unless-Up "MLflow" "http://127.0.0.1:5000/health" $mlflowData "& '$mlflow' server --host 127.0.0.1 --port 5000 --backend-store-uri sqlite:///mlflow.db --artifacts-destination ./mlartifacts"
     $backendEnv += "`$env:MLFLOW_TRACKING_URI = 'http://127.0.0.1:5000'; "
 }
 
-Start-Service-Window "StatMind API" (Join-Path $root "backend") "$backendEnv& '$python' -m uvicorn main:app --port 8000"
-Wait-For "StatMind API" "http://127.0.0.1:8000/api/health"
+Start-Unless-Up "StatMind API" "http://127.0.0.1:8000/api/health" (Join-Path $root "backend") "$backendEnv& '$python' -m uvicorn main:app --port 8000"
 
-Start-Service-Window "StatMind app" (Join-Path $root "frontend") "npm run dev -- --port 5173 --strictPort"
-Wait-For "StatMind app" "http://localhost:5173/"
+Start-Unless-Up "StatMind app" "http://localhost:5173/" (Join-Path $root "frontend") "npm run dev -- --port 5173 --strictPort"
 
 Write-Host ""
 Write-Host "App      http://localhost:5173"

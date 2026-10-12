@@ -188,12 +188,56 @@ upload; an unreachable repository means nothing can be stored at all.
 it to answer only from that. With no API key, or on any API error, keyword rules answer instead,
 and the UI says which one replied. Tests never touch the network.
 
-## 7. Known limitations
+## 7. Serving and monitoring
+
+### The production stage decides which model answers
+`backend/services/serving.py`. `POST /api/predict?target=churned` uses whichever model is in
+production for that target, and promoting a model retires the previous one.
+
+**Why:** callers should not hold model ids. Rolling out a new model, or rolling back, is then a
+change in the registry and nothing else. **One production model per target** removes any ambiguity
+about which one answers.
+
+**Why serve inside the API instead of a model server (BentoML, KServe, MLflow serving):** one fewer
+service to run, and it is enough for a few requests a second. The trade-off is no independent
+scaling and no batching; at real traffic the model server is the right answer.
+
+**Why cache models in memory:** unpickling a pipeline per request costs more than the prediction.
+Saved models are immutable, so the cache is always correct; it is bounded to eight models.
+
+### Drift is tested against the training data, per column
+`backend/services/drift.py`, using Evidently.
+
+**Why drift at all:** a model is validated once, on a split of old data. Nothing in that number
+tells you when the world has moved. Comparing incoming data with training data is the earliest
+signal available, because it needs no labels.
+
+**Why not measure accuracy instead:** that needs the true outcome for each prediction, which
+arrives later or never (did the customer churn?). It is the better measurement and is not built.
+
+**Why correct for multiple tests:** each column is tested at the 0.05 level. With 20 columns that
+never changed, the chance at least one is flagged is 1 − 0.95²⁰ ≈ 64%. Dividing the threshold by
+the number of columns (Bonferroni) keeps the chance of any false alarm near 5%, at the cost of
+missing small shifts. For large samples Evidently switches from p-values to distances
+(Wasserstein, Jensen-Shannon), because with thousands of rows every tiny difference is
+"significant".
+
+**Likely questions**
+- *A column drifted. Is the model broken?* Not necessarily. If the column barely matters to the
+  model, the drift is harmless. Cross-check it with the permutation importance.
+- *What would you do on a drift alarm?* Look at which columns moved and whether that is expected
+  (a price change, a new region), check recent outcomes if any exist, then retrain on newer data.
+- *Data drift versus concept drift?* Data drift is the inputs changing, which this detects.
+  Concept drift is the relationship between inputs and outcome changing; it is invisible without
+  labels.
+
+## 8. Known limitations
 
 - Everything is in-memory pandas; uploads are capped at 50 MB.
 - AutoML cross-validates on at most 20,000 rows and skips SVM and KNN above 5,000.
-- Models can only score an uploaded file; there is no online prediction endpoint.
-- No drift monitoring or automatic retraining.
+- Predictions are served from inside the API process; there is no separate model server.
+- Drift is checked on request, not on a schedule; true outcomes are not recorded, so accuracy over
+  time is not measured; nothing retrains automatically.
 - Saved models are pickles tied to this codebase and its library versions.
 - lakeFS uses one branch; prediction files and reports are committed only with the next dataset or model.
 - The benchmark results are on small textbook datasets.

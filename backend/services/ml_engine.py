@@ -13,7 +13,7 @@ from pandas.api.types import is_bool_dtype, is_datetime64_any_dtype, is_numeric_
 
 from services.file_reader import read_uploaded_file
 from services.experiment_tracker import log_experiment
-from services import lakefs_versioning, mlflow_tracking
+from services import lakefs_versioning, mlflow_tracking, prediction_log
 from services.dataset_registry import get_dataset
 from services.model_registry import get_model_record, register_model
 from services.artifacts import create_artifact
@@ -1427,6 +1427,11 @@ def predict_with_saved_model(model_id: str, test_file_path: str, owner_id: str) 
         output_df[prediction_column] = final_predictions
     else:
         output_df[prediction_column] = raw_predictions
+
+    # Kept for drift monitoring: what the model was asked, and what it answered
+    prediction_log.log_predictions(
+        owner_id, model_id, "file", X_new, output_df[prediction_column].tolist()
+    )
 
     external_metrics = None
 

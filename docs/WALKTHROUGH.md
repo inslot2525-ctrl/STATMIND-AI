@@ -18,7 +18,7 @@ a record of every dataset, run and model.
 | **Statistics Studio** | Upload a file; schema, data quality score, summary statistics, charts |
 | **ML Studio** | Suggest a target, check leakage, train one model or run AutoML, read the model report |
 | **Prediction Studio** | Score a new file with a saved model and download the predictions |
-| **MLOps Studio** | Experiments, model registry with stages, dataset versions |
+| **MLOps Studio** | Experiments, model registry with stages, dataset versions; per model: the prediction API and drift check |
 | **AI Analyst** | Ask questions about the results; export an HTML report |
 
 ## 2. Project structure
@@ -29,14 +29,15 @@ STATMIND-AI/
 │   ├── main.py                  app, CORS, routers, startup
 │   ├── config.py                every setting, read from environment variables
 │   ├── database.py              SQLAlchemy models + automatic migrations
-│   ├── migrations/              Alembic migration scripts (0001-0003)
+│   ├── migrations/              Alembic migration scripts (0001-0004)
 │   ├── worker.py                standalone background job worker
 │   ├── manage.py                admin commands
 │   ├── routes/                  HTTP endpoints, thin: validate, call a service, return
 │   └── services/                all the logic
 ├── frontend/src/                React + Vite single-page app
-├── tests/                       pytest suite (141 tests in 15 files) + sample datasets
-├── docs/                        this file, design decisions, deploy guide, screenshots
+├── tests/                       pytest suite (160 tests in 16 files) + sample datasets
+├── demo/                        sample datasets for the demo script
+├── docs/                        this file, design decisions, demo script, deploy guide, screenshots
 ├── docker-compose.yml           Postgres + API + worker + MLflow + frontend
 ├── start-dev.ps1                starts lakeFS + MLflow + API + app locally (Windows)
 └── .github/workflows/ci.yml     tests on SQLite and Postgres, Docker builds
@@ -69,7 +70,11 @@ poll ────────── GET /api/jobs/{id} ◀── progress ──
                                          → model registry → experiment log
 result ◀───────────────────────────────────────────┘
 
-Predict ─────── POST /api/predict-test-data ─▶ ml_engine.predict_with_saved_model
+Predict (file) ─ POST /api/predict-test-data ─▶ ml_engine.predict_with_saved_model ─┐
+Predict (JSON) ─ POST /api/predict?target=… ──▶ serving.predict_records ────────────┤
+                                                              prediction_log  ◀─────┘
+Check drift ──── GET /api/models/{id}/drift ──▶ drift.check_drift
+                                                 training data vs logged inputs (Evidently)
 Download ────── GET /api/artifacts/{id}/download-url ─▶ short-lived signed link
 Ask ─────────── POST /api/chat-analyst ──────▶ ai_analyst (Claude, or rules)
 ```
@@ -91,8 +96,9 @@ and in production with only the environment changed.
 
 ### `database.py` and `migrations/` — data model
 
-**What it does.** Six tables: `users`, `datasets`, `experiments`, `models`
-(the model registry), `jobs` and `artifacts`, plus Alembic's version table. `init_db()`
+**What it does.** Seven tables: `users`, `datasets`, `experiments`, `models`
+(the model registry), `jobs`, `artifacts` and `prediction_logs`, plus Alembic's
+version table. `init_db()`
 runs pending migrations at startup, so the schema is always current.
 
 **Why this way.** Alembic migrations instead of `create_all` means an existing
@@ -193,7 +199,8 @@ The largest module. In order:
   curves, confusion matrix, per-class scores, or predicted-vs-actual),
   permutation importance, baseline metrics, then save, commit, log and register.
 - **`predict_with_saved_model`** loads a model the user owns, checks the new
-  file has the required columns, predicts, and stores the result as a download.
+  file has the required columns, predicts, logs the batch for drift monitoring,
+  and stores the result as a download.
 
 **Why this way.** Preprocessing is inside the pipeline, so cross-validation
 cannot leak statistics between folds and the saved model applies identical
@@ -246,6 +253,49 @@ training run with hyperparameters and metrics. Artifacts are downloadable files
 **Why this way.** A model is a pickle, and unpickling runs code, so
 `load_model_artifact` only loads a model that is registered to the requesting
 user with a server-generated storage key.
+
+### `services/serving.py` and `prediction_log.py` — the prediction API
+
+**What it does.** `predict_records` takes JSON records, checks that every
+column the model needs is present, converts numeric fields, predicts, and
+returns predictions with class probabilities. `production_model_id` finds the
+model in production for a target column, which is what
+`POST /api/predict?target=…` uses. Every prediction, from the API or from an
+uploaded file, is written to the `prediction_logs` table as one batch.
+
+**Why this way.**
+- *The production stage does something.* Callers ask for "the production model
+  for churned"; promoting another model switches what they get, and the
+  registry allows only one production model per target.
+- *Models are cached in memory* (the 8 most recent, keyed by owner and id),
+  because unpickling on every request would dominate the latency. Saved models
+  never change, so the cache cannot go stale.
+- *Inputs are logged* because monitoring is impossible without knowing what
+  the model was asked. Batches over 2,000 rows are sampled.
+
+**Limits.** It runs inside the API process: no separate model server, no
+batching, no autoscaling. Requests are capped at 1,000 records. The log stores
+inputs as JSON text, which would not suit high traffic.
+
+### `services/drift.py` — drift monitoring
+
+**What it does.** Compares a model's recent logged inputs with its training
+dataset using Evidently: one test per column, plus the model's predictions
+against the training target. Returns a verdict (stable, warning, drift), the
+columns that moved, and on request the full Evidently HTML report.
+
+**Why this way.**
+- *The training dataset is the reference*, found through the model registry,
+  so there is nothing to configure.
+- *The default window is the most recent batch*, reaching back only if that
+  batch has fewer than 30 rows, so "did the file I just scored look normal?"
+  has a direct answer.
+- *P-value thresholds are divided by the number of columns tested.* At 0.05
+  per column, 20 unchanged columns give a false alarm about two times in three.
+
+**Limits.** Date columns are not checked. Drift is not accuracy: there is no
+way to record true outcomes yet, so real performance over time is not measured.
+Nothing runs on a schedule and nothing retrains automatically.
 
 ### `services/mlflow_tracking.py` — optional MLflow
 
@@ -303,6 +353,7 @@ anywhere; `analysis_engine.py` replaced them.
 |---|---|
 | `App.jsx` | App state, the page functions (Dashboard, Statistics, ML, Prediction, MLOps), the top bar |
 | `MlResults.jsx` | Model report, AutoML leaderboard, leakage report, and their charts |
+| `ModelOps.jsx` | Per-model serving and monitoring: try the API, check drift, download the report |
 | `AnalystPanel.jsx` | The chat and the report button; owns its own state |
 | `AuthScreen.jsx` | Login and registration, shown only when the server requires login |
 | `api.js` | Every backend call: token handling, `runJob` (start a job and poll), downloads |
@@ -325,7 +376,7 @@ still in MLOps Studio).
 
 ## 6. Tests and CI
 
-141 tests in `tests/`, run with `pytest` from the repo root against a throwaway
+160 tests in `tests/`, run with `pytest` from the repo root against a throwaway
 data directory:
 
 | Area | Files |
@@ -334,6 +385,7 @@ data directory:
 | Jobs, storage on S3 (mocked with moto), migrations | `test_jobs.py`, `test_storage_s3.py`, `test_migrations.py` |
 | AutoML, task detection, preprocessing, explainability | `test_automl.py`, `test_ml_engine.py`, `test_benchmark.py` |
 | Leakage detector and target advisor | `test_leakage.py` |
+| Prediction API, prediction log, drift (stable data, shifted data, windows) | `test_serving.py` |
 | Analyst (fake Claude client), MLflow (temporary local store), lakeFS (fake API, plus one test against a real server when configured) | `test_analyst.py`, `test_mlflow.py`, `test_lakefs.py` |
 
 CI runs the suite on SQLite and PostgreSQL, builds both Docker images, and

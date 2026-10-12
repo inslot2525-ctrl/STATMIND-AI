@@ -10,7 +10,7 @@ import os
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint,
+    Boolean, Column, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint,
     create_engine, event, inspect,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker
@@ -128,6 +128,21 @@ class Artifact(Base):
     kind = Column(String(30), nullable=False)
     storage_key = Column(String, nullable=False)
     filename = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False, default=utcnow)
+
+
+class PredictionLog(Base):
+    """One batch of predictions a model made: its inputs and outputs, for drift monitoring."""
+    __tablename__ = "prediction_logs"
+    __table_args__ = (Index("ix_prediction_logs_owner_model", "owner_id", "model_id", "created_at"),)
+    id = Column(String(32), primary_key=True)
+    owner_id = Column(String(32), ForeignKey("users.id"), nullable=False)
+    model_id = Column(String, nullable=False)
+    source = Column(String(20), nullable=False)  # api | file
+    rows = Column(Integer, nullable=False)  # rows predicted
+    logged_rows = Column(Integer, nullable=False)  # rows kept (large batches are sampled)
+    features = Column(Text, nullable=False)  # JSON list of input records
+    predictions = Column(Text, nullable=False)  # JSON list, same order
     created_at = Column(DateTime, nullable=False, default=utcnow)
 
 

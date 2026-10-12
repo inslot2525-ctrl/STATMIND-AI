@@ -23,6 +23,7 @@ from routes.intelligence_routes import router as intelligence_router  # noqa: E4
 from routes.job_routes import router as job_router  # noqa: E402
 from routes.ml_routes import router as ml_router, model_router, experiment_router  # noqa: E402
 from routes.prediction_routes import router as prediction_router  # noqa: E402
+from routes.serving_routes import router as serving_router  # noqa: E402
 from routes.target_routes import router as target_router  # noqa: E402
 
 
@@ -92,6 +93,7 @@ app.include_router(job_router, prefix="/api", tags=["Jobs"], dependencies=_prote
 app.include_router(experiment_router, prefix="/api", tags=["Experiments"], dependencies=_protected)
 app.include_router(model_router, prefix="/api", tags=["Model Registry"], dependencies=_protected)
 app.include_router(prediction_router, prefix="/api", tags=["Prediction Studio"], dependencies=_protected)
+app.include_router(serving_router, prefix="/api", tags=["Serving and Monitoring"], dependencies=_protected)
 app.include_router(artifact_router, prefix="/api", tags=["Artifacts"], dependencies=_protected)
 app.include_router(intelligence_router, prefix="/api", tags=["Intelligence Center"], dependencies=_protected)
 
@@ -113,6 +115,8 @@ def root():
             "Dataset Versioning",
             "Experiment Tracking",
             "Model Registry",
+            "Prediction API",
+            "Drift Monitoring",
             "Background Jobs",
             "User Accounts",
         ],

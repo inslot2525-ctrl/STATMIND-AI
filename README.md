@@ -54,6 +54,14 @@ Upload data → Get intelligence. That's it.
 
 ![Saved model with MLflow and lakeFS lineage](docs/screenshots/saved-model-lineage.png)
 
+**Prediction API** — every model can be called with JSON; the production stage decides which model answers
+
+![Prediction API](docs/screenshots/prediction-api.png)
+
+**Drift monitoring** — recent inputs tested against the training data, column by column
+
+![Drift monitoring](docs/screenshots/drift-monitoring.png)
+
 **Leakage check** — how well each feature predicts the target on its own
 
 ![Leakage check](docs/screenshots/leakage-check.png)
@@ -64,7 +72,8 @@ Upload data → Get intelligence. That's it.
 
 Screenshots use a synthetic customer-churn dataset (1,500 rows).
 
-**Further reading:** [how the code works, module by module](docs/WALKTHROUGH.md) ·
+**Further reading:** [a six-minute demo script](docs/DEMO.md) ·
+[how the code works, module by module](docs/WALKTHROUGH.md) ·
 [design decisions and their trade-offs](docs/DESIGN_DECISIONS.md) ·
 [hosting a public demo](docs/DEPLOY.md)
 
@@ -206,6 +215,39 @@ Download it. Send it. Look extremely smart in meetings.
 
 ---
 
+### 🚀 Prediction API
+Every saved model can be called over HTTP with JSON records, and answers with predictions and class
+probabilities:
+
+```bash
+curl -X POST "http://localhost:8000/api/predict?target=churned" \
+  -H "Content-Type: application/json" \
+  -d '{"records": [{"age": 25, "plan": "Premium", "contract_type": "Monthly", "...": "..."}]}'
+```
+
+- `/api/models/{id}/predict` calls one specific model.
+- `/api/predict?target=<column>` calls **whichever model is in production** for that target.
+  Promoting a model in MLOps Studio retires the previous one, so callers never change anything.
+- Missing columns and non-numeric values are rejected with a clear message; extra columns are ignored.
+- Models are kept in memory after first use, and every request is logged for monitoring.
+
+---
+
+### 📉 Drift Monitoring
+A model is trained on yesterday's data and used on today's. StatMind logs what each model is asked
+to predict and, on request, tests those inputs against the training data with
+[Evidently](https://www.evidentlyai.com/):
+
+- One statistical test per column, with the columns that moved listed first
+- The model's own predictions are compared with the target it was trained on
+- A plain verdict: **stable**, **warning**, or **drift**
+- The full Evidently report, with the distributions, as a download
+
+Drift is a warning, not an accuracy figure: a column can drift harmlessly, and a model can degrade
+with no drift. Measuring real accuracy needs the true outcomes.
+
+---
+
 ### 🧬 MLOps Studio
 Everything the app trains is tracked, with no setup:
 
@@ -239,6 +281,7 @@ statmind-ai/
 │   │   ├── ml_routes.py            # /api/train-model, /api/compare-models (jobs), registries
 │   │   ├── job_routes.py           # /api/jobs
 │   │   ├── prediction_routes.py    # /api/predict-test-data
+│   │   ├── serving_routes.py       # /api/models/{id}/predict, /api/predict, /drift
 │   │   ├── artifact_routes.py      # /api/artifacts (signed download links)
 │   │   └── intelligence_routes.py  # /api/chat-analyst, /api/detect-leakage, /api/generate-report
 │   └── services/
@@ -249,6 +292,9 @@ statmind-ai/
 │       ├── mlflow_tracking.py      # MLflow runs and model registry (optional)
 │       ├── artifacts.py            # Owned downloadable files
 │       ├── ml_engine.py            # Preprocessing, training, cross-validated AutoML, explainability, predictions
+│       ├── serving.py              # Online prediction API and the production model lookup
+│       ├── prediction_log.py       # What each model was asked and answered
+│       ├── drift.py                # Evidently drift checks against the training data
 │       ├── leakage_detector.py     # Leakage checks
 │       ├── ai_analyst.py           # Claude-backed analyst with a rule-based fallback
 │       ├── dataset_registry.py, experiment_tracker.py, model_registry.py
@@ -258,6 +304,7 @@ statmind-ai/
     └── src/
         ├── App.jsx           # Studios and app state
         ├── MlResults.jsx     # Model report, AutoML leaderboard, leakage report
+        ├── ModelOps.jsx      # Try the prediction API and check drift, per model
         ├── AnalystPanel.jsx  # AI analyst chat and report export
         ├── AuthScreen.jsx    # Login / registration
         ├── api.js            # API client: tokens, job polling, downloads
@@ -266,6 +313,7 @@ statmind-ai/
         └── spotlight.js      # Pointer-following border highlight
 
 tests/                        # pytest suite: API, auth, isolation, jobs, storage, AutoML, leakage, MLflow, lakeFS
+demo/                         # Sample datasets for the demo script
 start-dev.ps1                 # Starts lakeFS + MLflow + API + app locally (Windows)
 ```
 
@@ -397,7 +445,12 @@ In local development requests without a token act as the built-in local user.
 | `POST` | `/api/train-model` | Start a training job → `202` + job. Optional `task_type` (`auto`, `classification`, `regression`) |
 | `POST` | `/api/compare-models` | Start an AutoML job (cross-validate, tune, save the winner) → `202` + job |
 | `GET`  | `/api/jobs/{id}` | Job status, progress, and result when finished |
-| `POST` | `/api/predict-test-data` | Run predictions with a saved model |
+| `POST` | `/api/predict-test-data` | Run predictions on an uploaded file with a saved model |
+| `POST` | `/api/models/{id}/predict` | Predict for JSON `records` with one model |
+| `POST` | `/api/predict?target=...` | Predict with the production model for a target column |
+| `GET`  | `/api/models/{id}/serving` | A model's inputs, an example record, and how many predictions are logged |
+| `GET`  | `/api/models/{id}/drift?window=latest\|all` | Drift verdict and per-column results |
+| `POST` | `/api/models/{id}/drift/report` | Build the full Evidently HTML report → artifact id |
 | `GET`  | `/api/artifacts/{id}/download-url` | Short-lived link to download a prediction CSV or report |
 | `POST` | `/api/chat-analyst` | Ask the AI analyst (JSON `question`, `context`, optional `history`) |
 | `POST` | `/api/detect-leakage` | Data leakage detection |
@@ -515,6 +568,7 @@ Step-by-step instructions for Railway + Vercel are in [docs/DEPLOY.md](docs/DEPL
 - [boto3](https://boto3.amazonaws.com/) — S3 / R2 / MinIO storage
 - [scikit-learn](https://scikit-learn.org/) — ML algorithms, cross-validation, tuning, permutation importance
 - [Anthropic SDK](https://github.com/anthropics/anthropic-sdk-python) — Claude-backed AI analyst (optional)
+- [Evidently](https://www.evidentlyai.com/) — drift tests and reports
 - [MLflow](https://mlflow.org/) — experiment tracking and model registry (optional)
 - [lakeFS](https://lakefs.io/) — version control for datasets and models (optional)
 - [pandas](https://pandas.pydata.org/) — data manipulation
@@ -542,7 +596,8 @@ Step-by-step instructions for Railway + Vercel are in [docs/DEPLOY.md](docs/DEPL
 - [ ] Time series forecasting module
 - [ ] NLP / text column analysis
 - [ ] Per-prediction explanations (SHAP values)
-- [ ] Model serving endpoint and drift monitoring
+- [x] Prediction API with a production stage, and drift monitoring
+- [ ] Automatic retraining when drift is detected
 - [ ] lakeFS branches per experiment, with merge and revert from the UI
 - [ ] Multi-file join and merge studio
 - [ ] Export to Jupyter Notebook

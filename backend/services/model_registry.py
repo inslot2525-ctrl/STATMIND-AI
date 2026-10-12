@@ -134,9 +134,34 @@ def transition_model_stage(model_id, stage, owner_id, version=None):
         meta["stage"] = stage
         obj.metadata_json = json.dumps(meta, default=str)
         obj.updated_at = datetime.now().isoformat()
+
+        # One production model per target: the prediction API serves "the
+        # production model for <target>", so promoting one retires the other
+        retired = []
+        if stage == "production" and meta.get("target_column"):
+            others = db.query(ModelRegistry).filter(
+                ModelRegistry.owner_id == owner_id, ModelRegistry.model_id != model_id
+            ).all()
+            for other in others:
+                other_meta = json.loads(other.metadata_json) if other.metadata_json else {}
+                if other_meta.get("target_column") != meta["target_column"] or other_meta.get("stage") != "production":
+                    continue
+                other_versions = json.loads(other.versions_json) if other.versions_json else []
+                for v in other_versions:
+                    if v.get("stage") == "production":
+                        v["stage"] = "archived"
+                        v["transitioned_at"] = datetime.now().isoformat()
+                other.versions_json = json.dumps(other_versions)
+                other_meta["stage"] = "archived"
+                other.metadata_json = json.dumps(other_meta, default=str)
+                other.updated_at = datetime.now().isoformat()
+                retired.append(other_meta.get("mlflow"))
+
         db.commit()
 
-        # Keep the MLflow model version's stage and aliases in step, if it has one
+        # Keep the MLflow model versions' stages and aliases in step, if they have one
+        for mlflow_info in retired:
+            mlflow_tracking.sync_stage(mlflow_info, "archived")
         mlflow_tracking.sync_stage(meta.get("mlflow"), stage)
 
         return _to_dict(obj)
