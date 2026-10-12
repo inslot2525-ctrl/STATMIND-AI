@@ -25,6 +25,7 @@ import AnalystPanel from "./AnalystPanel";
 import { installSpotlight } from "./spotlight";
 import { Leaderboard, LeakageReport, ModelReport } from "./MlResults";
 import ModelOps from "./ModelOps";
+import { CategoricalStats, ColumnOverview, NumericStats } from "./StatsTables";
 import {
   apiFetch,
   clearSession,
@@ -1244,14 +1245,14 @@ function App() {
               )}
             </Card>
 
-            <Card title="Advanced Numeric Statistics">
-              <pre>{JSON.stringify(result.statistics?.numeric_summary || {}, null, 2)}</pre>
+            <Card title="Columns and Types">
+              <ColumnOverview schema={result.schema} rows={result.rows} />
             </Card>
-            <Card title="Categorical Statistics">
-              <pre>{JSON.stringify(result.statistics?.categorical_summary || {}, null, 2)}</pre>
+            <Card title="Numeric Columns">
+              <NumericStats summary={result.statistics?.numeric_summary} />
             </Card>
-            <Card title="Detected Schema">
-              <pre>{JSON.stringify(result.schema || {}, null, 2)}</pre>
+            <Card title="Category Columns">
+              <CategoricalStats summary={result.statistics?.categorical_summary} rows={result.rows} />
             </Card>
           </>
         )}

@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 
 from services.file_reader import read_uploaded_file
+from services.ml_engine import detect_datetime_columns
 
 # --- Performance tuning constants ---
 SAMPLE_ROWS_FOR_CHARTS = 5000
@@ -68,6 +69,11 @@ def detect_schema(df: pd.DataFrame) -> dict:
         "categorical_columns": categorical_columns,
         "datetime_columns": datetime_columns,
         "text_columns": text_columns,
+        # Text columns whose values parse as dates (a CSV has no date type);
+        # training treats these as dates too
+        "date_like_columns": [
+            col for col in detect_datetime_columns(df) if col not in datetime_columns
+        ],
         "missing_values": {
             col: int(df[col].isna().sum()) for col in df.columns
         },
