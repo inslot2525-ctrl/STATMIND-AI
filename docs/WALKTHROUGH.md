@@ -341,12 +341,6 @@ answer.
 
 Turns the same context into one self-contained HTML file, stored as an artifact.
 
-### Not used
-
-`services/schema_detector.py`, `chart_recommender.py`, `domain_analyzer.py` and
-`stats_engine.py` are left from an earlier version and are not imported
-anywhere; `analysis_engine.py` replaced them.
-
 ## 5. Frontend (`frontend/src`)
 
 | File | Role |

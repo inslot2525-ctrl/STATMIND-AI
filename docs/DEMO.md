@@ -56,12 +56,18 @@ When it finishes:
 - Press **Production**. Point at the second endpoint: `/api/predict?target=churned` now answers with
   this model, and promoting another model would switch it with no change for the caller.
 - Press **Predict** on the pre-filled record: a prediction with class probabilities.
-- Optional, in a terminal:
+- Optional, in a PowerShell window, to show it is a real API:
 
   ```powershell
-  curl.exe -X POST "http://127.0.0.1:8000/api/predict?target=churned" -H "Content-Type: application/json" `
-    -d '{\"records\":[{\"signup_date\":\"2024-08-15\",\"age\":25,\"gender\":\"Male\",\"region\":\"West\",\"plan\":\"Premium\",\"contract_type\":\"Monthly\",\"payment_method\":\"Credit Card\",\"tenure_months\":4,\"monthly_charges\":954.61,\"avg_weekly_usage_hours\":15.9,\"support_tickets\":2,\"late_payments\":2}]}'
+  $body = @{ records = @(@{ signup_date = "2024-08-15"; age = 25; gender = "Male"; region = "West";
+      plan = "Premium"; contract_type = "Monthly"; payment_method = "Credit Card"; tenure_months = 4;
+      monthly_charges = 954.61; avg_weekly_usage_hours = 15.9; support_tickets = 2; late_payments = 2 }) } |
+      ConvertTo-Json -Depth 4
+  Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8000/api/predict?target=churned" `
+      -ContentType "application/json" -Body $body
   ```
+
+  It returns the prediction and the probability of each class.
 
 ## 6. Catch drift (90 s) — Prediction Studio, then back to the model
 

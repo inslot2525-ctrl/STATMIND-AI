@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, memo, lazy, Suspense } from "react";
+import { useState, useEffect, useMemo, memo } from "react";
 import {
   BarChart,
   Bar,
@@ -371,7 +371,6 @@ function App() {
   const [mlopsError, setMlopsError] = useState("");
   const [selectedExperiment, setSelectedExperiment] = useState(null);
   const [selectedModel, setSelectedModel] = useState(null);
-  const [stageTarget, setStageTarget] = useState({});
   const [stageLoading, setStageLoading] = useState({});
 
   const analyze = async () => {
